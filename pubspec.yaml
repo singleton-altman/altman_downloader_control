@@ -1,0 +1,33 @@
+name: altman_downloader_control
+description: A new Flutter module project.
+version: 1.0.0+1
+environment:
+  sdk: '>=3.8.0 <4.0.0'
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.8
+  dio: ^5.7.0
+  dio_cookie_manager: ^3.1.1
+  get: ^4.6.6
+  freezed_annotation: ^2.4.4
+  json_annotation: ^4.9.0
+  cookie_jar: ^4.0.8
+  talker: ^5.1.13
+  talker_flutter: ^5.1.13
+  intl: ^0.20.2
+  flutter_keyboard_visibility: ^6.0.0
+  cached_network_image: ^3.4.1
+  flutter_widget_from_html_core: ^0.16.0
+  shared_preferences: ^2.3.2
+  collection: ^1.19.1
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+flutter:
+  uses-material-design: true
+  module:
+    androidX: true
+    androidPackage: com.example.altman_downloader_control
+    iosBundleIdentifier: com.example.altmanDownloaderControl
