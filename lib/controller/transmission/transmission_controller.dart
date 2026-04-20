@@ -5,6 +5,7 @@ import 'package:altman_downloader_control/controller/transmission/transmission_s
 import 'package:altman_downloader_control/model/qb_preferences_model.dart';
 import 'package:altman_downloader_control/model/server_state_model.dart';
 import 'package:altman_downloader_control/model/torrent_item_model.dart';
+import 'package:altman_downloader_control/model/transmission_list_sort_type.dart';
 import 'package:altman_downloader_control/utils/log.dart';
 import 'package:get/get.dart';
 
@@ -30,6 +31,9 @@ class TransmissionController extends GetxController
 
   @override
   final autoRefresh = false.obs;
+
+  final listSearchKeyword = ''.obs;
+  final listSortType = TransmissionTorrentSortType.dateAdded.obs;
 
   // 种子列表（使用通用模型）
   final torrents = <TorrentModel>[].obs;

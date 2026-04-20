@@ -13,7 +13,9 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:altman_downloader_control/controller/qbittorrent/qb_controller.dart';
+import 'package:altman_downloader_control/controller/transmission/transmission_controller.dart';
 import 'package:altman_downloader_control/model/qb_sort_type.dart';
+import 'package:altman_downloader_control/model/transmission_list_sort_type.dart';
 import 'package:altman_downloader_control/utils/string_utils.dart';
 
 class DownloaderTorrentListPage extends StatefulWidget {
@@ -62,7 +64,6 @@ class _DownloaderTorrentListPageState extends State<DownloaderTorrentListPage> {
     return controller.torrentsUniversal;
   }
 
-  // 辅助方法：获取筛选后的种子列表（仅 qBittorrent 支持）
   List<TorrentModel> get filteredTorrentsList {
     if (controller is QBController) {
       final qbController = controller as QBController;
@@ -73,8 +74,60 @@ class _DownloaderTorrentListPageState extends State<DownloaderTorrentListPage> {
       }
       return qbController.torrentsUniversal;
     }
-    // Transmission 等其他下载器直接返回全部
+    if (controller is TransmissionController) {
+      final tr = controller as TransmissionController;
+      final kw = tr.listSearchKeyword.value.trim().toLowerCase();
+      var list = tr.torrentsUniversal;
+      if (kw.isNotEmpty) {
+        list = list.where((t) {
+          if (t.name.toLowerCase().contains(kw)) return true;
+          if (t.category.toLowerCase().contains(kw)) return true;
+          for (final tag in t.tags) {
+            if (tag.toLowerCase().contains(kw)) return true;
+          }
+          return false;
+        }).toList();
+      }
+      list = List<TorrentModel>.from(list);
+      _sortTransmissionList(list, tr.listSortType.value);
+      return list;
+    }
     return controller.torrentsUniversal;
+  }
+
+  void _sortTransmissionList(
+    List<TorrentModel> list,
+    TransmissionTorrentSortType type,
+  ) {
+    switch (type) {
+      case TransmissionTorrentSortType.name:
+        list.sort(
+          (a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()),
+        );
+        break;
+      case TransmissionTorrentSortType.size:
+        list.sort((a, b) => b.totalSize.compareTo(a.totalSize));
+        break;
+      case TransmissionTorrentSortType.progress:
+        list.sort((a, b) => b.progress.compareTo(a.progress));
+        break;
+      case TransmissionTorrentSortType.dateAdded:
+        list.sort((a, b) => b.addedOn.compareTo(a.addedOn));
+        break;
+      case TransmissionTorrentSortType.speed:
+        list.sort((a, b) {
+          final sa = a.dlspeed + a.upspeed;
+          final sb = b.dlspeed + b.upspeed;
+          return sb.compareTo(sa);
+        });
+        break;
+      case TransmissionTorrentSortType.seeds:
+        list.sort((a, b) => b.numSeeds.compareTo(a.numSeeds));
+        break;
+      case TransmissionTorrentSortType.ratio:
+        list.sort((a, b) => b.ratio.compareTo(a.ratio));
+        break;
+    }
   }
 
   // 辅助方法：是否支持筛选功能（仅 qBittorrent 支持）
@@ -85,9 +138,6 @@ class _DownloaderTorrentListPageState extends State<DownloaderTorrentListPage> {
 
   // 辅助方法：是否支持偏好设置（仅 qBittorrent 支持）
   bool get supportsPreferences => isQBittorrent;
-
-  // 辅助方法：是否支持排序功能（仅 qBittorrent 支持）
-  bool get supportsSort => isQBittorrent;
 
   @override
   Widget build(BuildContext context) {
@@ -235,9 +285,7 @@ class _DownloaderTorrentListPageState extends State<DownloaderTorrentListPage> {
                       const SizedBox(width: 8),
                       Expanded(child: _buildFloatingFakeInputBar(context)),
                       const SizedBox(width: 8),
-                      supportsSort
-                          ? _buildFloatingSortBy(context)
-                          : const SizedBox.shrink(),
+                      _buildFloatingSortBy(context),
                     ],
                   ),
                 ),
@@ -263,17 +311,7 @@ class _DownloaderTorrentListPageState extends State<DownloaderTorrentListPage> {
 
   Widget _buildFloatingFilterButton(BuildContext context) {
     if (controller is! QBController) {
-      final normalColor = Theme.of(context).colorScheme.onSurfaceVariant;
-      return CupertinoButton(
-        padding: EdgeInsets.zero,
-        minSize: 0,
-        onPressed: null,
-        child: Icon(
-          CupertinoIcons.slider_horizontal_3,
-          size: 20,
-          color: normalColor.withValues(alpha: 0.45),
-        ),
-      );
+      return const SizedBox(width: 0);
     }
     final qbController = controller as QBController;
     return Obx(() {
@@ -294,6 +332,45 @@ class _DownloaderTorrentListPageState extends State<DownloaderTorrentListPage> {
   }
 
   Widget _buildFloatingFakeInputBar(BuildContext context) {
+    if (controller is TransmissionController) {
+      final tr = controller as TransmissionController;
+      return GestureDetector(
+        onTap: () => _openTrKeywordSheet(context),
+        child: Container(
+          height: 36,
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          decoration: BoxDecoration(
+            color: Theme.of(
+              context,
+            ).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+            borderRadius: BorderRadius.circular(999),
+          ),
+          child: Row(
+            children: [
+              Icon(
+                CupertinoIcons.search,
+                size: 16,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Obx(() {
+                  final keyword = tr.listSearchKeyword.value;
+                  return Text(
+                    keyword.isEmpty ? '搜索名称、分类、标签…' : keyword,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                  );
+                }),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
     if (controller is! QBController) {
       return Container(
         height: 36,
@@ -355,7 +432,50 @@ class _DownloaderTorrentListPageState extends State<DownloaderTorrentListPage> {
   }
 
   Widget _buildFloatingSortBy(BuildContext context) {
-    return _buildIOSSortButton(context);
+    if (controller is QBController) {
+      return _buildIOSSortButton(context);
+    }
+    if (controller is TransmissionController) {
+      return _buildTrSortButton(context);
+    }
+    return const SizedBox.shrink();
+  }
+
+  Future<void> _openTrKeywordSheet(BuildContext context) async {
+    if (controller is! TransmissionController) return;
+    final tr = controller as TransmissionController;
+    final inputController = TextEditingController(
+      text: tr.listSearchKeyword.value,
+    );
+    final submitted = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        final insets = MediaQuery.of(ctx).viewInsets;
+        return Padding(
+          padding: EdgeInsets.only(bottom: insets.bottom),
+          child: Container(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+            decoration: BoxDecoration(
+              color: Theme.of(ctx).colorScheme.surface,
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(18),
+              ),
+            ),
+            child: CupertinoSearchTextField(
+              controller: inputController,
+              autofocus: true,
+              placeholder: '搜索名称、分类、标签…',
+              onSubmitted: (v) => Navigator.of(ctx).pop(v),
+            ),
+          ),
+        );
+      },
+    );
+    inputController.dispose();
+    if (submitted == null) return;
+    tr.listSearchKeyword.value = submitted.trim();
   }
 
   Future<void> _openKeywordSheet(BuildContext context) async {
@@ -652,9 +772,100 @@ class _DownloaderTorrentListPageState extends State<DownloaderTorrentListPage> {
     );
   }
 
+  Widget _buildTrSortButton(BuildContext context) {
+    if (controller is! TransmissionController) {
+      return const SizedBox.shrink();
+    }
+    return Obx(() {
+      final tr = controller as TransmissionController;
+      final current = tr.listSortType.value;
+      final theme = Theme.of(context);
+      IconData iconFor(TransmissionTorrentSortType type) {
+        switch (type) {
+          case TransmissionTorrentSortType.name:
+            return Icons.sort_by_alpha_rounded;
+          case TransmissionTorrentSortType.size:
+            return Icons.storage_rounded;
+          case TransmissionTorrentSortType.progress:
+            return Icons.percent_rounded;
+          case TransmissionTorrentSortType.dateAdded:
+            return Icons.calendar_today_rounded;
+          case TransmissionTorrentSortType.speed:
+            return Icons.speed_rounded;
+          case TransmissionTorrentSortType.seeds:
+            return Icons.people_rounded;
+          case TransmissionTorrentSortType.ratio:
+            return Icons.compare_arrows_rounded;
+        }
+      }
+
+      return PopupMenuButton<TransmissionTorrentSortType>(
+        offset: const Offset(0, 40),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        onSelected: (v) => tr.listSortType.value = v,
+        itemBuilder: (ctx) =>
+            TransmissionTorrentSortType.sortTypes.map((sortType) {
+              final isSelected = sortType == current;
+              final iconColor = isSelected
+                  ? theme.colorScheme.primary
+                  : theme.colorScheme.onSurfaceVariant;
+              return PopupMenuItem<TransmissionTorrentSortType>(
+                value: sortType,
+                child: Row(
+                  children: [
+                    Icon(iconFor(sortType), size: 18, color: iconColor),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        sortType.label,
+                        style: TextStyle(
+                          color: isSelected
+                              ? theme.colorScheme.primary
+                              : theme.colorScheme.onSurface,
+                          fontWeight: isSelected
+                              ? FontWeight.w600
+                              : FontWeight.normal,
+                          fontSize: 15,
+                        ),
+                      ),
+                    ),
+                    if (isSelected) ...[
+                      const SizedBox(width: 8),
+                      Icon(
+                        Icons.check_circle_rounded,
+                        size: 18,
+                        color: theme.colorScheme.primary,
+                      ),
+                    ],
+                  ],
+                ),
+              );
+            }).toList(),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              current.label,
+              style: TextStyle(
+                color: theme.colorScheme.primary,
+                fontWeight: FontWeight.w600,
+                fontSize: 13,
+              ),
+            ),
+            const SizedBox(width: 4),
+            Icon(
+              Icons.arrow_drop_down_rounded,
+              size: 16,
+              color: theme.colorScheme.primary,
+            ),
+          ],
+        ),
+      );
+    });
+  }
+
   Widget _buildIOSSortButton(BuildContext context) {
-    // 仅 qBittorrent 支持排序
-    if (!supportsSort || controller is! QBController) {
+    if (controller is! QBController) {
       return const SizedBox.shrink();
     }
 

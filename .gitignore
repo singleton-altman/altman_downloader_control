@@ -37,6 +37,7 @@ Icon?
 .tags*
 
 build/
+downloader_control_example/
 .ohos/node_modules/
 .android/
 .ios/

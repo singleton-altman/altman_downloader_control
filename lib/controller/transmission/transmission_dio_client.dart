@@ -99,7 +99,9 @@ class TransmissionDioClient {
       throw Exception('Client not initialized');
     }
 
-    final url = '${_baseUrl!}/transmission/rpc';
+    final raw = _baseUrl!;
+    final base = raw.endsWith('/') ? raw : '$raw/';
+    final url = '${base}transmission/rpc';
     final headers = _getAuthHeaders();
 
     final requestBody = <String, dynamic>{
@@ -116,14 +118,27 @@ class TransmissionDioClient {
     );
 
     try {
-      final response = await _dio.post(
-        url,
-        data: requestBody,
-        options: Options(
-          headers: headers,
-          validateStatus: (status) => status != null && status < 500,
-        ),
-      );
+      Response response;
+      var attempt503 = 0;
+      const max503 = 4;
+      for (;;) {
+        response = await _dio.post(
+          url,
+          data: requestBody,
+          options: Options(
+            headers: headers,
+            validateStatus: (status) => status != null && status < 600,
+          ),
+        );
+        if (response.statusCode == 503 && attempt503 < max503) {
+          attempt503++;
+          final ms = 500 * attempt503 * attempt503;
+          _log.w('Transmission 503, retry $attempt503/$max503 in ${ms}ms');
+          await Future.delayed(Duration(milliseconds: ms));
+          continue;
+        }
+        break;
+      }
 
       // 处理 409 状态码（Session ID 冲突）
       if (response.statusCode == 409) {
