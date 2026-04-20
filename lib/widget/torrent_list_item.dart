@@ -18,11 +18,19 @@ import '../utils/string_utils.dart';
 class TorrentListItem extends StatelessWidget {
   final TorrentModel torrent;
   final DownloaderControllerProtocol controller;
+  final bool selectionMode;
+  final bool selected;
+  final VoidCallback? onToggleSelected;
+  final VoidCallback? onLongPressEnterSelect;
 
   const TorrentListItem({
     super.key,
     required this.torrent,
     required this.controller,
+    this.selectionMode = false,
+    this.selected = false,
+    this.onToggleSelected,
+    this.onLongPressEnterSelect,
   });
 
   @override
@@ -87,7 +95,16 @@ class TorrentListItem extends StatelessWidget {
     ];
 
     return InkWell(
-      onTap: () => _showTorrentDetails(context),
+      onTap: () {
+        if (selectionMode) {
+          onToggleSelected?.call();
+        } else {
+          _showTorrentDetails(context);
+        }
+      },
+      onLongPress: selectionMode || onLongPressEnterSelect == null
+          ? null
+          : () => onLongPressEnterSelect!(),
       borderRadius: BorderRadius.circular(16),
       child: Container(
         margin: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
@@ -97,8 +114,10 @@ class TorrentListItem extends StatelessWidget {
               ? colorScheme.surfaceContainerHighest.withValues(alpha: 0.5)
               : colorScheme.surface,
           border: Border.all(
-            color: stateColor.withValues(alpha: isDark ? 0.18 : 0.12),
-            width: 0.7,
+            color: selected
+                ? colorScheme.primary
+                : stateColor.withValues(alpha: isDark ? 0.18 : 0.12),
+            width: selected ? 1.8 : 0.7,
           ),
           boxShadow: [
             BoxShadow(
@@ -118,6 +137,22 @@ class TorrentListItem extends StatelessWidget {
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  if (selectionMode) ...[
+                    Padding(
+                      padding: const EdgeInsets.only(right: 6, top: 0),
+                      child: SizedBox(
+                        width: 22,
+                        height: 22,
+                        child: Checkbox(
+                          value: selected,
+                          onChanged: (_) => onToggleSelected?.call(),
+                          materialTapTargetSize:
+                              MaterialTapTargetSize.shrinkWrap,
+                          visualDensity: VisualDensity.compact,
+                        ),
+                      ),
+                    ),
+                  ],
                   Expanded(
                     child: Text(
                       torrent.name.trim().isEmpty ? '未命名任务' : torrent.name,
@@ -131,11 +166,13 @@ class TorrentListItem extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
-                  const SizedBox(width: 12),
-                  Padding(
-                    padding: const EdgeInsets.only(top: 2),
-                    child: _buildActionMenu(context),
-                  ),
+                  if (!selectionMode) ...[
+                    const SizedBox(width: 12),
+                    Padding(
+                      padding: const EdgeInsets.only(top: 2),
+                      child: _buildActionMenu(context),
+                    ),
+                  ],
                 ],
               ),
               Wrap(
