@@ -722,6 +722,8 @@ class _DownloaderTorrentListPageState extends State<DownloaderTorrentListPage> {
     final ops = _selectionBarOps();
     const primaryCount = 4;
     const wideBarW = 640.0;
+    const exitButtonSize = 48.0;
+    const actionSlotHeight = 44.0;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -732,115 +734,171 @@ class _DownloaderTorrentListPageState extends State<DownloaderTorrentListPage> {
               ? ops.sublist(primaryCount)
               : <_SelectionBarOp>[];
           final showAllInline = constraints.maxWidth >= wideBarW;
+          final inlineOps = showAllInline ? ops : primary;
 
-          return ClipRRect(
-            borderRadius: BorderRadius.circular(999),
-            child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 28, sigmaY: 28),
-              child: Container(
-                constraints: const BoxConstraints(minHeight: 52, maxHeight: 56),
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-                decoration: BoxDecoration(
-                  color: scheme.surface.withValues(alpha: 0.9),
+          return Row(
+            children: [
+              _buildSelectionExitFab(
+                context,
+                size: exitButtonSize,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: ClipRRect(
                   borderRadius: BorderRadius.circular(999),
-                  border: Border.all(
-                    color: scheme.outline.withValues(alpha: 0.1),
-                  ),
-                ),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        physics: const BouncingScrollPhysics(),
-                        child: Row(
-                          children: [
-                            if (showAllInline)
-                              for (final o in ops) _selectionBarIcon(context, o)
-                            else ...[
-                              for (final o in primary)
-                                _selectionBarIcon(context, o),
-                            ],
-                          ],
+                  child: BackdropFilter(
+                    filter: ImageFilter.blur(sigmaX: 28, sigmaY: 28),
+                    child: Container(
+                      constraints: const BoxConstraints(
+                        minHeight: 48,
+                        maxHeight: 52,
+                      ),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 4,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: scheme.surface.withValues(alpha: 0.9),
+                        borderRadius: BorderRadius.circular(999),
+                        border: Border.all(
+                          color: scheme.outline.withValues(alpha: 0.1),
                         ),
+                      ),
+                      child: Row(
+                        children: [
+                          for (final o in inlineOps)
+                            Expanded(
+                              child: _selectionBarIcon(
+                                context,
+                                o,
+                                height: actionSlotHeight,
+                              ),
+                            ),
+                          if (!showAllInline && secondary.isNotEmpty)
+                            Expanded(
+                              child: _buildSelectionMoreButton(
+                                context,
+                                secondary,
+                                height: actionSlotHeight,
+                              ),
+                            ),
+                        ],
                       ),
                     ),
-                    if (!showAllInline && secondary.isNotEmpty)
-                      PopupMenuButton<String>(
-                        tooltip: '更多操作',
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        icon: Icon(
-                          Icons.more_horiz_rounded,
-                          color: scheme.onSurfaceVariant,
-                        ),
-                        onSelected: (id) async {
-                          for (final o in secondary) {
-                            if (o.id == id && o.enabled) {
-                              await o.action();
-                              break;
-                            }
-                          }
-                        },
-                        itemBuilder: (ctx) {
-                          final menuScheme = Theme.of(ctx).colorScheme;
-                          return [
-                            for (final o in secondary)
-                              PopupMenuItem<String>(
-                                value: o.id,
-                                enabled: o.enabled,
-                                child: Tooltip(
-                                  message: o.tooltipMessage,
-                                  child: Row(
-                                    children: [
-                                      Icon(
-                                        o.icon,
-                                        size: 20,
-                                        color: _selectionBarIconColor(
-                                          menuScheme,
-                                          o,
-                                        ),
-                                      ),
-                                      const SizedBox(width: 12),
-                                      Text(
-                                        o.label,
-                                        style: Theme.of(
-                                          ctx,
-                                        ).textTheme.bodyMedium,
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                          ];
-                        },
-                      ),
-                  ],
+                  ),
                 ),
               ),
-            ),
+            ],
           );
         },
       ),
     );
   }
 
-  Widget _selectionBarIcon(BuildContext context, _SelectionBarOp o) {
+  Widget _buildSelectionExitFab(BuildContext context, {double size = 52}) {
+    final scheme = Theme.of(context).colorScheme;
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(999),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 28, sigmaY: 28),
+        child: Material(
+          color: scheme.surface.withValues(alpha: 0.92),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(999),
+            side: BorderSide(color: scheme.outline.withValues(alpha: 0.12)),
+          ),
+          child: InkWell(
+            onTap: _exitSelectionMode,
+            borderRadius: BorderRadius.circular(999),
+            child: SizedBox(
+              width: size,
+              height: size,
+              child: Icon(
+                Icons.close_rounded,
+                size: 21,
+                color: scheme.onSurface,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _selectionBarIcon(
+    BuildContext context,
+    _SelectionBarOp o, {
+    double height = 48,
+  }) {
     final scheme = Theme.of(context).colorScheme;
     final iconColor = _selectionBarIconColor(scheme, o);
     return SizedBox(
-      width: 80,
-      height: 48,
+      height: height,
       child: IconButton(
         padding: EdgeInsets.zero,
         tooltip: o.tooltipMessage,
-        icon: Icon(o.icon, size: 22, color: iconColor),
+        icon: Icon(o.icon, size: 20, color: iconColor),
         onPressed: o.enabled
             ? () async {
-                await o.action();
-              }
+              await o.action();
+            }
             : null,
+      ),
+    );
+  }
+
+  Widget _buildSelectionMoreButton(
+    BuildContext context,
+    List<_SelectionBarOp> secondary, {
+    double height = 48,
+  }) {
+    final scheme = Theme.of(context).colorScheme;
+    return SizedBox(
+      height: height,
+      child: PopupMenuButton<String>(
+        tooltip: '更多操作',
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        padding: EdgeInsets.zero,
+        icon: Icon(
+          Icons.more_horiz_rounded,
+          size: 21,
+          color: scheme.onSurfaceVariant,
+        ),
+        onSelected: (id) async {
+          for (final o in secondary) {
+            if (o.id == id && o.enabled) {
+              await o.action();
+              break;
+            }
+          }
+        },
+        itemBuilder: (ctx) {
+          final menuScheme = Theme.of(ctx).colorScheme;
+          return [
+            for (final o in secondary)
+              PopupMenuItem<String>(
+                value: o.id,
+                enabled: o.enabled,
+                child: Tooltip(
+                  message: o.tooltipMessage,
+                  child: Row(
+                    children: [
+                      Icon(
+                        o.icon,
+                        size: 20,
+                        color: _selectionBarIconColor(menuScheme, o),
+                      ),
+                      const SizedBox(width: 12),
+                      Text(
+                        o.label,
+                        style: Theme.of(ctx).textTheme.bodyMedium,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+          ];
+        },
       ),
     );
   }
@@ -2130,15 +2188,74 @@ class _DownloaderTorrentListPageState extends State<DownloaderTorrentListPage> {
         ),
       ),
       actions: [
-        TextButton(
-          onPressed: visible.isEmpty
-              ? null
-              : () => _toggleSelectAllVisible(visible),
-          child: Text(allOn ? '取消全选' : '全选'),
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: _buildSelectionActionChip(
+            context: context,
+            icon: allOn
+                ? Icons.checklist_rtl_rounded
+                : Icons.select_all_rounded,
+            label: allOn ? '取消全选' : '全选',
+            emphasized: allOn,
+            onTap: visible.isEmpty ? null : () => _toggleSelectAllVisible(visible),
+          ),
         ),
-        TextButton(onPressed: _exitSelectionMode, child: const Text('取消选择')),
         const SizedBox(width: 4),
       ],
+    );
+  }
+
+  Widget _buildSelectionActionChip({
+    required BuildContext context,
+    required IconData icon,
+    required String label,
+    required VoidCallback? onTap,
+    bool emphasized = false,
+  }) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final foreground = emphasized
+        ? colorScheme.onPrimaryContainer
+        : colorScheme.onSurfaceVariant;
+    final background = emphasized
+        ? colorScheme.primaryContainer
+        : colorScheme.surfaceContainerHighest.withValues(alpha: 0.72);
+    final borderColor = emphasized
+        ? colorScheme.primary.withValues(alpha: 0.22)
+        : colorScheme.outlineVariant.withValues(alpha: 0.28);
+
+    return Material(
+      color: onTap == null
+          ? background.withValues(alpha: 0.45)
+          : background,
+      borderRadius: BorderRadius.circular(999),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(999),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(color: borderColor, width: 0.8),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 16, color: foreground),
+              const SizedBox(width: 6),
+              Text(
+                label,
+                style: TextStyle(
+                  color: onTap == null
+                      ? foreground.withValues(alpha: 0.55)
+                      : foreground,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 12.5,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
