@@ -25,6 +25,8 @@ import 'package:altman_downloader_control/model/transmission_list_sort_type.dart
 import 'package:altman_downloader_control/utils/string_utils.dart';
 import 'package:altman_downloader_control/utils/torrent_state_localizable.dart';
 
+enum _SortDirectionChoice { ascending, descending }
+
 class DownloaderTorrentListPage extends StatefulWidget {
   const DownloaderTorrentListPage({super.key});
 
@@ -38,6 +40,8 @@ class _DownloaderTorrentListPageState extends State<DownloaderTorrentListPage> {
   final _isBootstrapping = true.obs;
   bool _selectionMode = false;
   final Set<String> _selectedHashes = <String>{};
+  final Map<QBTorrentSortType, bool> _qbSortAscending = {};
+  final Map<TransmissionTorrentSortType, bool> _trSortAscending = {};
 
   @override
   void initState() {
@@ -73,15 +77,71 @@ class _DownloaderTorrentListPageState extends State<DownloaderTorrentListPage> {
     return controller.torrentsUniversal;
   }
 
+  bool _defaultQbAscending(QBTorrentSortType type) {
+    switch (type) {
+      case QBTorrentSortType.name:
+      case QBTorrentSortType.status:
+        return true;
+      case QBTorrentSortType.size:
+      case QBTorrentSortType.progress:
+      case QBTorrentSortType.dateAdded:
+      case QBTorrentSortType.speed:
+      case QBTorrentSortType.seeds:
+      case QBTorrentSortType.ratio:
+        return false;
+    }
+  }
+
+  bool _defaultTransmissionAscending(TransmissionTorrentSortType type) {
+    switch (type) {
+      case TransmissionTorrentSortType.name:
+        return true;
+      case TransmissionTorrentSortType.size:
+      case TransmissionTorrentSortType.progress:
+      case TransmissionTorrentSortType.dateAdded:
+      case TransmissionTorrentSortType.speed:
+      case TransmissionTorrentSortType.seeds:
+      case TransmissionTorrentSortType.ratio:
+        return false;
+    }
+  }
+
+  bool _isQbSortAscending(QBTorrentSortType type) {
+    return _qbSortAscending.putIfAbsent(type, () => _defaultQbAscending(type));
+  }
+
+  bool _isTransmissionSortAscending(TransmissionTorrentSortType type) {
+    return _trSortAscending.putIfAbsent(
+      type,
+      () => _defaultTransmissionAscending(type),
+    );
+  }
+
+  int _withDirection(int compare, {required bool ascending}) {
+    return ascending ? compare : -compare;
+  }
+
+  int _compareAddedOn(TorrentModel a, TorrentModel b, {required bool ascending}) {
+    final aVal = a.addedOn;
+    final bVal = b.addedOn;
+    final aValid = aVal > 0;
+    final bValid = bVal > 0;
+    if (!aValid && !bValid) return 0;
+    if (!aValid) return 1;
+    if (!bValid) return -1;
+    return _withDirection(aVal.compareTo(bVal), ascending: ascending);
+  }
+
   List<TorrentModel> get filteredTorrentsList {
     if (controller is QBController) {
       final qbController = controller as QBController;
-      if (qbController.filter.value.hasFilters) {
-        return qbController.filteredTorrents
-            .map((t) => t.toTorrentModel())
-            .toList();
-      }
-      return qbController.torrentsUniversal;
+      final sortType = qbController.torrentSortType.value;
+      final ascending = _isQbSortAscending(sortType);
+      final list = qbController.filter.value.hasFilters
+          ? qbController.filteredTorrents.map((t) => t.toTorrentModel()).toList()
+          : List<TorrentModel>.from(qbController.torrentsUniversal);
+      _sortQbList(list, sortType, ascending: ascending);
+      return list;
     }
     if (controller is TransmissionController) {
       final tr = controller as TransmissionController;
@@ -98,43 +158,129 @@ class _DownloaderTorrentListPageState extends State<DownloaderTorrentListPage> {
         }).toList();
       }
       list = List<TorrentModel>.from(list);
-      _sortTransmissionList(list, tr.listSortType.value);
+      _sortTransmissionList(
+        list,
+        tr.listSortType.value,
+        ascending: _isTransmissionSortAscending(tr.listSortType.value),
+      );
       return list;
     }
     return controller.torrentsUniversal;
   }
 
+  void _sortQbList(
+    List<TorrentModel> list,
+    QBTorrentSortType type, {
+    required bool ascending,
+  }) {
+    switch (type) {
+      case QBTorrentSortType.name:
+        list.sort(
+          (a, b) => _withDirection(
+            a.name.toLowerCase().compareTo(b.name.toLowerCase()),
+            ascending: ascending,
+          ),
+        );
+        break;
+      case QBTorrentSortType.size:
+        list.sort(
+          (a, b) => _withDirection(a.size.compareTo(b.size), ascending: ascending),
+        );
+        break;
+      case QBTorrentSortType.progress:
+        list.sort(
+          (a, b) => _withDirection(
+            a.progress.compareTo(b.progress),
+            ascending: ascending,
+          ),
+        );
+        break;
+      case QBTorrentSortType.status:
+        list.sort(
+          (a, b) => _withDirection(
+            a.state.toLowerCase().compareTo(b.state.toLowerCase()),
+            ascending: ascending,
+          ),
+        );
+        break;
+      case QBTorrentSortType.dateAdded:
+        list.sort((a, b) => _compareAddedOn(a, b, ascending: ascending));
+        break;
+      case QBTorrentSortType.speed:
+        list.sort((a, b) {
+          final sa = a.dlspeed + a.upspeed;
+          final sb = b.dlspeed + b.upspeed;
+          return _withDirection(sa.compareTo(sb), ascending: ascending);
+        });
+        break;
+      case QBTorrentSortType.seeds:
+        list.sort(
+          (a, b) => _withDirection(
+            a.numSeeds.compareTo(b.numSeeds),
+            ascending: ascending,
+          ),
+        );
+        break;
+      case QBTorrentSortType.ratio:
+        list.sort(
+          (a, b) => _withDirection(a.ratio.compareTo(b.ratio), ascending: ascending),
+        );
+        break;
+    }
+  }
+
   void _sortTransmissionList(
     List<TorrentModel> list,
-    TransmissionTorrentSortType type,
-  ) {
+    TransmissionTorrentSortType type, {
+    required bool ascending,
+  }) {
     switch (type) {
       case TransmissionTorrentSortType.name:
         list.sort(
-          (a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()),
+          (a, b) => _withDirection(
+            a.name.toLowerCase().compareTo(b.name.toLowerCase()),
+            ascending: ascending,
+          ),
         );
         break;
       case TransmissionTorrentSortType.size:
-        list.sort((a, b) => b.totalSize.compareTo(a.totalSize));
+        list.sort(
+          (a, b) => _withDirection(
+            a.totalSize.compareTo(b.totalSize),
+            ascending: ascending,
+          ),
+        );
         break;
       case TransmissionTorrentSortType.progress:
-        list.sort((a, b) => b.progress.compareTo(a.progress));
+        list.sort(
+          (a, b) => _withDirection(
+            a.progress.compareTo(b.progress),
+            ascending: ascending,
+          ),
+        );
         break;
       case TransmissionTorrentSortType.dateAdded:
-        list.sort((a, b) => b.addedOn.compareTo(a.addedOn));
+        list.sort((a, b) => _compareAddedOn(a, b, ascending: ascending));
         break;
       case TransmissionTorrentSortType.speed:
         list.sort((a, b) {
           final sa = a.dlspeed + a.upspeed;
           final sb = b.dlspeed + b.upspeed;
-          return sb.compareTo(sa);
+          return _withDirection(sa.compareTo(sb), ascending: ascending);
         });
         break;
       case TransmissionTorrentSortType.seeds:
-        list.sort((a, b) => b.numSeeds.compareTo(a.numSeeds));
+        list.sort(
+          (a, b) => _withDirection(
+            a.numSeeds.compareTo(b.numSeeds),
+            ascending: ascending,
+          ),
+        );
         break;
       case TransmissionTorrentSortType.ratio:
-        list.sort((a, b) => b.ratio.compareTo(a.ratio));
+        list.sort(
+          (a, b) => _withDirection(a.ratio.compareTo(b.ratio), ascending: ascending),
+        );
         break;
     }
   }
@@ -1222,7 +1368,7 @@ class _DownloaderTorrentListPageState extends State<DownloaderTorrentListPage> {
               width: selected ? 1.8 : 0.7,
             ),
           ),
-          padding: const EdgeInsets.fromLTRB(4, 6, 6, 6),
+          padding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
           child: Align(
             alignment: Alignment.topCenter,
             child: Column(
@@ -1232,16 +1378,6 @@ class _DownloaderTorrentListPageState extends State<DownloaderTorrentListPage> {
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    SizedBox(
-                      width: 28,
-                      height: 28,
-                      child: Checkbox(
-                        value: selected,
-                        onChanged: (_) => _toggleHash(torrent.hash),
-                        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        visualDensity: VisualDensity.compact,
-                      ),
-                    ),
                     Expanded(
                       child: Text(
                         name,
@@ -1607,6 +1743,7 @@ class _DownloaderTorrentListPageState extends State<DownloaderTorrentListPage> {
     return Obx(() {
       final tr = controller as TransmissionController;
       final current = tr.listSortType.value;
+      final ascending = _isTransmissionSortAscending(current);
       final theme = Theme.of(context);
       IconData iconFor(TransmissionTorrentSortType type) {
         switch (type) {
@@ -1627,51 +1764,140 @@ class _DownloaderTorrentListPageState extends State<DownloaderTorrentListPage> {
         }
       }
 
-      return PopupMenuButton<TransmissionTorrentSortType>(
+      return PopupMenuButton<Object>(
         offset: const Offset(0, 40),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        onSelected: (v) => tr.listSortType.value = v,
-        itemBuilder: (ctx) =>
-            TransmissionTorrentSortType.sortTypes.map((sortType) {
-              final isSelected = sortType == current;
-              final iconColor = isSelected
-                  ? theme.colorScheme.primary
-                  : theme.colorScheme.onSurfaceVariant;
-              return PopupMenuItem<TransmissionTorrentSortType>(
-                value: sortType,
-                child: Row(
-                  children: [
-                    Icon(iconFor(sortType), size: 18, color: iconColor),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        sortType.label,
-                        style: TextStyle(
-                          color: isSelected
-                              ? theme.colorScheme.primary
-                              : theme.colorScheme.onSurface,
-                          fontWeight: isSelected
-                              ? FontWeight.w600
-                              : FontWeight.normal,
-                          fontSize: 15,
-                        ),
+        onSelected: (value) {
+          if (value is TransmissionTorrentSortType) {
+            tr.listSortType.value = value;
+            return;
+          }
+          if (value is _SortDirectionChoice) {
+            setState(() {
+              _trSortAscending[current] =
+                  value == _SortDirectionChoice.ascending;
+            });
+          }
+        },
+        itemBuilder: (ctx) => [
+          ...TransmissionTorrentSortType.sortTypes.map((sortType) {
+            final isSelected = sortType == current;
+            final iconColor = isSelected
+                ? theme.colorScheme.primary
+                : theme.colorScheme.onSurfaceVariant;
+            return PopupMenuItem<Object>(
+              value: sortType,
+              child: Row(
+                children: [
+                  Icon(iconFor(sortType), size: 18, color: iconColor),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      sortType.label,
+                      style: TextStyle(
+                        color: isSelected
+                            ? theme.colorScheme.primary
+                            : theme.colorScheme.onSurface,
+                        fontWeight: isSelected
+                            ? FontWeight.w600
+                            : FontWeight.normal,
+                        fontSize: 15,
                       ),
                     ),
-                    if (isSelected) ...[
-                      const SizedBox(width: 8),
-                      Icon(
-                        Icons.check_circle_rounded,
-                        size: 18,
-                        color: theme.colorScheme.primary,
-                      ),
-                    ],
+                  ),
+                  if (isSelected) ...[
+                    const SizedBox(width: 8),
+                    Icon(
+                      Icons.check_circle_rounded,
+                      size: 18,
+                      color: theme.colorScheme.primary,
+                    ),
                   ],
+                ],
+              ),
+            );
+          }),
+          const PopupMenuDivider(),
+          PopupMenuItem<Object>(
+            value: _SortDirectionChoice.ascending,
+            child: Row(
+              children: [
+                Icon(
+                  Icons.arrow_upward_rounded,
+                  size: 18,
+                  color: ascending
+                      ? theme.colorScheme.primary
+                      : theme.colorScheme.onSurfaceVariant,
                 ),
-              );
-            }).toList(),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    '正序',
+                    style: TextStyle(
+                      color: ascending
+                          ? theme.colorScheme.primary
+                          : theme.colorScheme.onSurface,
+                      fontWeight: ascending
+                          ? FontWeight.w600
+                          : FontWeight.normal,
+                      fontSize: 15,
+                    ),
+                  ),
+                ),
+                if (ascending)
+                  Icon(
+                    Icons.check_circle_rounded,
+                    size: 18,
+                    color: theme.colorScheme.primary,
+                  ),
+              ],
+            ),
+          ),
+          PopupMenuItem<Object>(
+            value: _SortDirectionChoice.descending,
+            child: Row(
+              children: [
+                Icon(
+                  Icons.arrow_downward_rounded,
+                  size: 18,
+                  color: !ascending
+                      ? theme.colorScheme.primary
+                      : theme.colorScheme.onSurfaceVariant,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    '倒序',
+                    style: TextStyle(
+                      color: !ascending
+                          ? theme.colorScheme.primary
+                          : theme.colorScheme.onSurface,
+                      fontWeight: !ascending
+                          ? FontWeight.w600
+                          : FontWeight.normal,
+                      fontSize: 15,
+                    ),
+                  ),
+                ),
+                if (!ascending)
+                  Icon(
+                    Icons.check_circle_rounded,
+                    size: 18,
+                    color: theme.colorScheme.primary,
+                  ),
+              ],
+            ),
+          ),
+        ],
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
+            Icon(
+              ascending ? Icons.arrow_upward_rounded : Icons.arrow_downward_rounded,
+              size: 14,
+              color: theme.colorScheme.primary,
+            ),
+            const SizedBox(width: 4),
             Text(
               current.label,
               style: TextStyle(
@@ -1680,7 +1906,7 @@ class _DownloaderTorrentListPageState extends State<DownloaderTorrentListPage> {
                 fontSize: 13,
               ),
             ),
-            const SizedBox(width: 4),
+            const SizedBox(width: 2),
             Icon(
               Icons.arrow_drop_down_rounded,
               size: 16,
@@ -1700,83 +1926,164 @@ class _DownloaderTorrentListPageState extends State<DownloaderTorrentListPage> {
     return Obx(() {
       final qbController = controller as QBController;
       final currentSortType = qbController.torrentSortType.value;
+      final ascending = _isQbSortAscending(currentSortType);
 
       final theme = Theme.of(context);
 
-      return PopupMenuButton<QBTorrentSortType>(
+      return PopupMenuButton<Object>(
         offset: const Offset(0, 40),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        onSelected: (QBTorrentSortType sortType) {
-          (controller as QBController).sortTorrents(sortType);
+        onSelected: (value) {
+          if (value is QBTorrentSortType) {
+            (controller as QBController).sortTorrents(value);
+            return;
+          }
+          if (value is _SortDirectionChoice) {
+            setState(() {
+              _qbSortAscending[currentSortType] =
+                  value == _SortDirectionChoice.ascending;
+            });
+          }
         },
-        itemBuilder: (BuildContext context) =>
-            QBTorrentSortType.sortTypes.map((sortType) {
-              // 为每个排序类型分配图标
-              IconData getSortIcon(QBTorrentSortType type) {
-                switch (type) {
-                  case QBTorrentSortType.size:
-                    return Icons.storage_rounded;
-                  case QBTorrentSortType.progress:
-                    return Icons.percent_rounded;
-                  case QBTorrentSortType.dateAdded:
-                    return Icons.calendar_today_rounded;
-                  case QBTorrentSortType.speed:
-                    return Icons.speed_rounded;
-                  case QBTorrentSortType.seeds:
-                    return Icons.people_rounded;
-                  case QBTorrentSortType.ratio:
-                    return Icons.compare_arrows_rounded;
-                  default:
-                    return Icons.sort_rounded;
-                }
+        itemBuilder: (BuildContext context) => [
+          ...QBTorrentSortType.sortTypes.map((sortType) {
+            IconData getSortIcon(QBTorrentSortType type) {
+              switch (type) {
+                case QBTorrentSortType.size:
+                  return Icons.storage_rounded;
+                case QBTorrentSortType.progress:
+                  return Icons.percent_rounded;
+                case QBTorrentSortType.dateAdded:
+                  return Icons.calendar_today_rounded;
+                case QBTorrentSortType.speed:
+                  return Icons.speed_rounded;
+                case QBTorrentSortType.seeds:
+                  return Icons.people_rounded;
+                case QBTorrentSortType.ratio:
+                  return Icons.compare_arrows_rounded;
+                default:
+                  return Icons.sort_rounded;
               }
+            }
 
-              final isSelected = sortType == currentSortType;
-              final iconColor = isSelected
-                  ? theme.colorScheme.primary
-                  : theme.colorScheme.onSurfaceVariant;
+            final isSelected = sortType == currentSortType;
+            final iconColor = isSelected
+                ? theme.colorScheme.primary
+                : theme.colorScheme.onSurfaceVariant;
 
-              return PopupMenuItem<QBTorrentSortType>(
-                value: sortType,
-                child: Row(
-                  children: [
-                    Icon(getSortIcon(sortType), size: 18, color: iconColor),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        sortType.label,
-                        style: TextStyle(
-                          color: isSelected
-                              ? theme.colorScheme.primary
-                              : theme.colorScheme.onSurface,
-                          fontWeight: isSelected
-                              ? FontWeight.w600
-                              : FontWeight.normal,
-                          fontSize: 15,
-                        ),
+            return PopupMenuItem<Object>(
+              value: sortType,
+              child: Row(
+                children: [
+                  Icon(getSortIcon(sortType), size: 18, color: iconColor),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      sortType.label,
+                      style: TextStyle(
+                        color: isSelected
+                            ? theme.colorScheme.primary
+                            : theme.colorScheme.onSurface,
+                        fontWeight: isSelected
+                            ? FontWeight.w600
+                            : FontWeight.normal,
+                        fontSize: 15,
                       ),
                     ),
-                    if (isSelected) ...[
-                      const SizedBox(width: 8),
-                      Icon(
-                        Icons.check_circle_rounded,
-                        size: 18,
-                        color: theme.colorScheme.primary,
-                      ),
-                    ],
+                  ),
+                  if (isSelected) ...[
+                    const SizedBox(width: 8),
+                    Icon(
+                      Icons.check_circle_rounded,
+                      size: 18,
+                      color: theme.colorScheme.primary,
+                    ),
                   ],
+                ],
+              ),
+            );
+          }),
+          const PopupMenuDivider(),
+          PopupMenuItem<Object>(
+            value: _SortDirectionChoice.ascending,
+            child: Row(
+              children: [
+                Icon(
+                  Icons.arrow_upward_rounded,
+                  size: 18,
+                  color: ascending
+                      ? theme.colorScheme.primary
+                      : theme.colorScheme.onSurfaceVariant,
                 ),
-              );
-            }).toList(),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    '正序',
+                    style: TextStyle(
+                      color: ascending
+                          ? theme.colorScheme.primary
+                          : theme.colorScheme.onSurface,
+                      fontWeight: ascending
+                          ? FontWeight.w600
+                          : FontWeight.normal,
+                      fontSize: 15,
+                    ),
+                  ),
+                ),
+                if (ascending)
+                  Icon(
+                    Icons.check_circle_rounded,
+                    size: 18,
+                    color: theme.colorScheme.primary,
+                  ),
+              ],
+            ),
+          ),
+          PopupMenuItem<Object>(
+            value: _SortDirectionChoice.descending,
+            child: Row(
+              children: [
+                Icon(
+                  Icons.arrow_downward_rounded,
+                  size: 18,
+                  color: !ascending
+                      ? theme.colorScheme.primary
+                      : theme.colorScheme.onSurfaceVariant,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    '倒序',
+                    style: TextStyle(
+                      color: !ascending
+                          ? theme.colorScheme.primary
+                          : theme.colorScheme.onSurface,
+                      fontWeight: !ascending
+                          ? FontWeight.w600
+                          : FontWeight.normal,
+                      fontSize: 15,
+                    ),
+                  ),
+                ),
+                if (!ascending)
+                  Icon(
+                    Icons.check_circle_rounded,
+                    size: 18,
+                    color: theme.colorScheme.primary,
+                  ),
+              ],
+            ),
+          ),
+        ],
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Icon(
-            //   Icons.sort_rounded,
-            //   size: 16,
-            //   color: theme.colorScheme.primary,
-            // ),
-            // const SizedBox(width: 6),
+            Icon(
+              ascending ? Icons.arrow_upward_rounded : Icons.arrow_downward_rounded,
+              size: 14,
+              color: theme.colorScheme.primary,
+            ),
+            const SizedBox(width: 4),
             Text(
               currentSortType.label,
               style: TextStyle(
@@ -1785,7 +2092,7 @@ class _DownloaderTorrentListPageState extends State<DownloaderTorrentListPage> {
                 fontSize: 13,
               ),
             ),
-            const SizedBox(width: 4),
+            const SizedBox(width: 2),
             Icon(
               Icons.arrow_drop_down_rounded,
               size: 16,

@@ -137,22 +137,6 @@ class TorrentListItem extends StatelessWidget {
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  if (selectionMode) ...[
-                    Padding(
-                      padding: const EdgeInsets.only(right: 6, top: 0),
-                      child: SizedBox(
-                        width: 22,
-                        height: 22,
-                        child: Checkbox(
-                          value: selected,
-                          onChanged: (_) => onToggleSelected?.call(),
-                          materialTapTargetSize:
-                              MaterialTapTargetSize.shrinkWrap,
-                          visualDensity: VisualDensity.compact,
-                        ),
-                      ),
-                    ),
-                  ],
                   Expanded(
                     child: Text(
                       torrent.name.trim().isEmpty ? '未命名任务' : torrent.name,
