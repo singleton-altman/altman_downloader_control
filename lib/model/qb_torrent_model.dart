@@ -361,7 +361,7 @@ class QBTorrentModel {
   }
 
   /// 转换为通用 TorrentModel
-  TorrentModel toTorrentModel() {
-    return TorrentModel.fromQBTorrentModel(this);
+  TorrentModel toTorrentModel({TorrentModel? previous}) {
+    return TorrentModel.fromQBTorrentModel(this, previous: previous);
   }
 }

@@ -205,6 +205,7 @@ class TransmissionTorrent {
   final int? dateDone;
   final String? creator;
   final int? dateCreated;
+  final int? addedDate;
   final int? downloadLimit;
   final int? uploadLimit;
   final String? downloadDir;
@@ -270,6 +271,7 @@ class TransmissionTorrent {
     this.dateDone,
     this.creator,
     this.dateCreated,
+    this.addedDate,
     this.downloadLimit,
     this.uploadLimit,
     this.downloadDir,
@@ -337,6 +339,7 @@ class TransmissionTorrent {
       dateDone: _parseInt(json['dateDone']),
       creator: json['creator'] as String?,
       dateCreated: _parseInt(json['dateCreated']),
+      addedDate: _parseInt(json['addedDate']),
       downloadLimit: _parseInt(json['downloadLimit']),
       uploadLimit: _parseInt(json['uploadLimit']),
       downloadDir: json['downloadDir'] as String?,

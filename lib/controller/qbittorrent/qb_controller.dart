@@ -68,6 +68,7 @@ class QBController extends GetxController
 
   // MainData 同步相关
   int? _rid; // Response ID，用于增量同步
+  final Map<String, TorrentModel> _torrentUniversalByHash = {};
 
   @override
   DownloaderConfig? config;
@@ -249,6 +250,7 @@ class QBController extends GetxController
     } catch (e) {
       errorMessage.value = '获取种子列表失败: ${e.toString()}';
       torrents.clear();
+      _torrentUniversalByHash.clear();
     }
   }
 
@@ -284,7 +286,11 @@ class QBController extends GetxController
         _applyFilter();
       } else {
         // 使用 diff 算法进行增量更新（内部会调用 _applySorting 和 _applyFilter）
-        _applyTorrentsDiff(mainData.torrents, mainData.torrentsRemoved);
+        _applyTorrentsDiff(
+          mainData.torrents,
+          mainData.torrentsRemoved,
+          mainData.torrentDeltas,
+        );
       }
 
       // 请求成功后，根据资源数量安排下一次刷新
@@ -346,6 +352,7 @@ class QBController extends GetxController
   void _applyTorrentsDiff(
     Map<String, QBTorrentModel> newTorrents,
     List<String> removedHashes,
+    Map<String, Map<String, dynamic>> torrentDeltas,
   ) {
     // 如果列表为空，直接赋值并排序
     if (torrents.isEmpty) {
@@ -387,7 +394,11 @@ class QBController extends GetxController
         hasChanges = true;
       } else {
         // 更新：合并增量数据，保留旧数据中未更新的字段
-        final mergedTorrent = _mergeTorrentData(existingTorrent, partialUpdate);
+        final mergedTorrent = _mergeTorrentData(
+          existingTorrent,
+          partialUpdate,
+          torrentDeltas[hash] ?? const {},
+        );
         if (_hasTorrentChanged(existingTorrent, mergedTorrent)) {
           final index = torrents.indexWhere((t) => t.hash == hash);
           if (index != -1) {
@@ -412,147 +423,231 @@ class QBController extends GetxController
   /// 合并种子数据：将增量更新数据合并到现有数据上
   /// maindata 接口返回的数据通常是完整的，但某些情况下可能只返回变化的字段
   /// 我们采用保守策略：总是使用新数据，但对于可能被清空的字段进行保护
+  T _mergeIfDeltaHasKey<T>(
+    Map<String, dynamic> delta,
+    String jsonKey,
+    T partialVal,
+    T existingVal,
+  ) {
+    return delta.containsKey(jsonKey) ? partialVal : existingVal;
+  }
+
   QBTorrentModel _mergeTorrentData(
     QBTorrentModel existing,
     QBTorrentModel partial,
+    Map<String, dynamic> rawDelta,
   ) {
-    // qBittorrent 的 maindata 接口在增量更新时通常会返回完整对象
-    // 但为了安全，我们对关键字段进行保护：
-    // 1. name、savePath 等字符串字段：如果新值为空但旧值不为空，保留旧值
-    // 2. size、addedOn 等数值字段：如果新值为0但旧值不为0，可能是数据丢失，保留旧值
-    // 3. 其他字段直接使用新值（因为它们是动态的，可能确实会变为0）
+    // qBittorrent 的 maindata 增量更新只下发变更字段。
+    // 因此合并时必须以 rawDelta 是否带 key 为准，避免 fromJson 的默认值
+    // （0、''、[]、-1）把未变化的历史数据覆盖掉。
 
     return QBTorrentModel(
       hash: partial.hash.isNotEmpty ? partial.hash : existing.hash,
-      // name 是关键字段，不应该被清空
-      name: (partial.name.isNotEmpty || existing.name.isEmpty)
-          ? partial.name
-          : existing.name,
-      // size 不应该为0，如果为0则保留旧值
-      size: (partial.size > 0 || existing.size == 0)
-          ? partial.size
-          : existing.size,
-      // totalSize 不应该为0，如果为0则使用 size
-      totalSize: (partial.totalSize > 0 || existing.totalSize == 0)
+      name: _mergeIfDeltaHasKey(rawDelta, 'name', partial.name, existing.name),
+      size: _mergeIfDeltaHasKey(rawDelta, 'size', partial.size, existing.size),
+      totalSize: rawDelta.containsKey('total_size') || rawDelta.containsKey('size')
           ? partial.totalSize
-          : (existing.totalSize > 0 ? existing.totalSize : partial.size),
-      // progress 保护：如果新值为 0 但旧值不为 0（可能是数据丢失），保留旧值
-      // progress 的范围是 0.0 到 1.0，1.0 表示 100% 完成
-      progress: (partial.progress > 0 || existing.progress == 0)
-          ? partial.progress
-          : existing.progress,
-      dlspeed: partial.dlspeed, // 速度可能为0，使用新值
-      upspeed: partial.upspeed, // 速度可能为0，使用新值
-      priority: partial.priority, // 优先级可能为0，使用新值
-      numSeeds: partial.numSeeds, // 可能为0，使用新值
-      numLeechers: partial.numLeechers, // 可能为0，使用新值
-      numComplete: (partial.numComplete >= 0)
-          ? partial.numComplete
-          : (existing.numComplete >= 0 ? existing.numComplete : 0),
-      numIncomplete: (partial.numIncomplete >= 0)
-          ? partial.numIncomplete
-          : (existing.numIncomplete >= 0 ? existing.numIncomplete : 0),
-      ratio: partial.ratio, // 可能为0，使用新值
-      popularity: partial.hasPopularityField
-          ? partial.popularity
-          : existing.popularity,
+          : existing.totalSize,
+      progress: _mergeIfDeltaHasKey(
+        rawDelta,
+        'progress',
+        partial.progress,
+        existing.progress,
+      ),
+      dlspeed: _mergeIfDeltaHasKey(
+        rawDelta,
+        'dlspeed',
+        partial.dlspeed,
+        existing.dlspeed,
+      ),
+      upspeed: _mergeIfDeltaHasKey(
+        rawDelta,
+        'upspeed',
+        partial.upspeed,
+        existing.upspeed,
+      ),
+      priority: _mergeIfDeltaHasKey(
+        rawDelta,
+        'priority',
+        partial.priority,
+        existing.priority,
+      ),
+      numSeeds: _mergeIfDeltaHasKey(
+        rawDelta,
+        'num_seeds',
+        partial.numSeeds,
+        existing.numSeeds,
+      ),
+      numLeechers: _mergeIfDeltaHasKey(
+        rawDelta,
+        'num_leechs',
+        partial.numLeechers,
+        existing.numLeechers,
+      ),
+      numComplete: _mergeIfDeltaHasKey(
+        rawDelta,
+        'num_complete',
+        partial.numComplete,
+        existing.numComplete,
+      ),
+      numIncomplete: _mergeIfDeltaHasKey(
+        rawDelta,
+        'num_incomplete',
+        partial.numIncomplete,
+        existing.numIncomplete,
+      ),
+      ratio: _mergeIfDeltaHasKey(rawDelta, 'ratio', partial.ratio, existing.ratio),
+      popularity: _mergeIfDeltaHasKey(
+        rawDelta,
+        'popularity',
+        partial.popularity,
+        existing.popularity,
+      ),
       hasPopularityField:
-          partial.hasPopularityField || existing.hasPopularityField,
-      eta: partial.eta, // 可能为-1或0，使用新值
-      state: partial.state.isNotEmpty ? partial.state : existing.state,
-      // category 保护：如果新值为空但旧值不为空，保留旧值（防止增量更新时丢失分类信息）
-      category: (partial.category.isNotEmpty || existing.category.isEmpty)
-          ? partial.category
-          : existing.category,
-      // tags 保护：如果新值为空列表但旧值不为空，保留旧值（防止增量更新时丢失标签信息）
-      tags: partial.tags.isNotEmpty || existing.tags.isEmpty
-          ? partial.tags
-          : existing.tags,
-      // addedOn 不应该为0，如果为0则保留旧值
-      // 添加 null 安全检查（运行时保护，防止动态类型导致的 null）
-      addedOn: () {
-        try {
-          // 使用动态转换以处理可能的 null 值
-          final partialVal = (partial.addedOn as dynamic);
-          final existingVal = (existing.addedOn as dynamic);
-
-          // 安全地获取整数值，处理 null 或无效类型
-          int partialAddedOn = 0;
-          if (partialVal is int) {
-            partialAddedOn = partialVal;
-          } else if (partialVal != null) {
-            partialAddedOn = (partialVal as num?)?.toInt() ?? 0;
-          }
-
-          int existingAddedOn = 0;
-          if (existingVal is int) {
-            existingAddedOn = existingVal;
-          } else if (existingVal != null) {
-            existingAddedOn = (existingVal as num?)?.toInt() ?? 0;
-          }
-
-          // 如果 partial 有有效值（>0），或者 existing 没有有效值（==0），使用 partial
-          return (partialAddedOn > 0 || existingAddedOn == 0)
-              ? partialAddedOn
-              : existingAddedOn;
-        } catch (e) {
-          // 如果出现任何异常，尝试使用原始值或默认值
-          try {
-            final existingVal2 = (existing.addedOn as dynamic);
-            final partialVal2 = (partial.addedOn as dynamic);
-            if (existingVal2 is int && existingVal2 > 0) return existingVal2;
-            if (partialVal2 is int && partialVal2 > 0) return partialVal2;
-            return 0;
-          } catch (_) {
-            return 0;
-          }
-        }
-      }(),
-      completionOn: partial.completionOn, // 可能为0（未完成），使用新值
-      lastActivity: partial.lastActivity, // 最后活动时间，使用新值
-      seenComplete: partial.seenComplete, // 看到完成的时间，使用新值
-      // savePath 是关键字段，不应该被清空
-      savePath: (partial.savePath.isNotEmpty || existing.savePath.isEmpty)
-          ? partial.savePath
-          : existing.savePath,
-      // 路径字段：如果新值为空，保留旧值
-      contentPath:
-          (partial.contentPath.isNotEmpty || existing.contentPath.isEmpty)
-          ? partial.contentPath
-          : existing.contentPath,
-      downloadPath:
-          (partial.downloadPath.isNotEmpty || existing.downloadPath.isEmpty)
-          ? partial.downloadPath
-          : existing.downloadPath,
-      rootPath: (partial.rootPath.isNotEmpty || existing.rootPath.isEmpty)
-          ? partial.rootPath
-          : existing.rootPath,
-      downloaded: partial.downloaded, // 可能为0，使用新值
-      completed: partial.completed, // 已完成的字节数，使用新值
-      uploaded: partial.uploaded, // 可能为0，使用新值
-      downloadedSession: partial.downloadedSession, // 可能为0，使用新值
-      uploadedSession: partial.uploadedSession, // 可能为0，使用新值
-      amountLeft: partial.amountLeft, // 可能为0，使用新值
-      // tracker 不应该被清空
-      tracker: (partial.tracker.isNotEmpty || existing.tracker.isEmpty)
-          ? partial.tracker
-          : existing.tracker,
-      // 字符串字段：如果新值为空，保留旧值
-      comment: (partial.comment.isNotEmpty || existing.comment.isEmpty)
-          ? partial.comment
-          : existing.comment,
-      magnetUri: (partial.magnetUri.isNotEmpty || existing.magnetUri.isEmpty)
-          ? partial.magnetUri
-          : existing.magnetUri,
-      availability: partial.hasAvailabilityField
-          ? partial.availability
-          : existing.availability,
+          rawDelta.containsKey('popularity') || existing.hasPopularityField,
+      eta: _mergeIfDeltaHasKey(rawDelta, 'eta', partial.eta, existing.eta),
+      state: _mergeIfDeltaHasKey(rawDelta, 'state', partial.state, existing.state),
+      category: _mergeIfDeltaHasKey(
+        rawDelta,
+        'category',
+        partial.category,
+        existing.category,
+      ),
+      tags: _mergeIfDeltaHasKey(rawDelta, 'tags', partial.tags, existing.tags),
+      addedOn: _mergeIfDeltaHasKey(
+        rawDelta,
+        'added_on',
+        partial.addedOn,
+        existing.addedOn,
+      ),
+      completionOn: _mergeIfDeltaHasKey(
+        rawDelta,
+        'completion_on',
+        partial.completionOn,
+        existing.completionOn,
+      ),
+      lastActivity: _mergeIfDeltaHasKey(
+        rawDelta,
+        'last_activity',
+        partial.lastActivity,
+        existing.lastActivity,
+      ),
+      seenComplete: _mergeIfDeltaHasKey(
+        rawDelta,
+        'seen_complete',
+        partial.seenComplete,
+        existing.seenComplete,
+      ),
+      savePath: _mergeIfDeltaHasKey(
+        rawDelta,
+        'save_path',
+        partial.savePath,
+        existing.savePath,
+      ),
+      contentPath: _mergeIfDeltaHasKey(
+        rawDelta,
+        'content_path',
+        partial.contentPath,
+        existing.contentPath,
+      ),
+      downloadPath: _mergeIfDeltaHasKey(
+        rawDelta,
+        'download_path',
+        partial.downloadPath,
+        existing.downloadPath,
+      ),
+      rootPath: _mergeIfDeltaHasKey(
+        rawDelta,
+        'root_path',
+        partial.rootPath,
+        existing.rootPath,
+      ),
+      downloaded: _mergeIfDeltaHasKey(
+        rawDelta,
+        'downloaded',
+        partial.downloaded,
+        existing.downloaded,
+      ),
+      completed: _mergeIfDeltaHasKey(
+        rawDelta,
+        'completed',
+        partial.completed,
+        existing.completed,
+      ),
+      uploaded: _mergeIfDeltaHasKey(
+        rawDelta,
+        'uploaded',
+        partial.uploaded,
+        existing.uploaded,
+      ),
+      downloadedSession: _mergeIfDeltaHasKey(
+        rawDelta,
+        'downloaded_session',
+        partial.downloadedSession,
+        existing.downloadedSession,
+      ),
+      uploadedSession: _mergeIfDeltaHasKey(
+        rawDelta,
+        'uploaded_session',
+        partial.uploadedSession,
+        existing.uploadedSession,
+      ),
+      amountLeft: _mergeIfDeltaHasKey(
+        rawDelta,
+        'amount_left',
+        partial.amountLeft,
+        existing.amountLeft,
+      ),
+      tracker: _mergeIfDeltaHasKey(
+        rawDelta,
+        'tracker',
+        partial.tracker,
+        existing.tracker,
+      ),
+      comment: _mergeIfDeltaHasKey(
+        rawDelta,
+        'comment',
+        partial.comment,
+        existing.comment,
+      ),
+      magnetUri: _mergeIfDeltaHasKey(
+        rawDelta,
+        'magnet_uri',
+        partial.magnetUri,
+        existing.magnetUri,
+      ),
+      availability: _mergeIfDeltaHasKey(
+        rawDelta,
+        'availability',
+        partial.availability,
+        existing.availability,
+      ),
       hasAvailabilityField:
-          partial.hasAvailabilityField || existing.hasAvailabilityField,
-      dlLimit: partial.dlLimit, // -1表示无限制，使用新值
-      upLimit: partial.upLimit, // -1表示无限制，使用新值
-      timeActive: partial.timeActive, // 可能为0，使用新值
-      seedingTime: partial.seedingTime, // 可能为0，使用新值
+          rawDelta.containsKey('availability') || existing.hasAvailabilityField,
+      dlLimit: _mergeIfDeltaHasKey(
+        rawDelta,
+        'dl_limit',
+        partial.dlLimit,
+        existing.dlLimit,
+      ),
+      upLimit: _mergeIfDeltaHasKey(
+        rawDelta,
+        'up_limit',
+        partial.upLimit,
+        existing.upLimit,
+      ),
+      timeActive: _mergeIfDeltaHasKey(
+        rawDelta,
+        'time_active',
+        partial.timeActive,
+        existing.timeActive,
+      ),
+      seedingTime: _mergeIfDeltaHasKey(
+        rawDelta,
+        'seeding_time',
+        partial.seedingTime,
+        existing.seedingTime,
+      ),
     );
   }
 
@@ -1841,8 +1936,20 @@ class QBController extends GetxController
       serverState.value?.toServerStateModel();
 
   @override
-  List<TorrentModel> get torrentsUniversal =>
-      torrents.map((t) => t.toTorrentModel()).toList();
+  List<TorrentModel> get torrentsUniversal {
+    final out = <TorrentModel>[];
+    final next = <String, TorrentModel>{};
+    for (final t in torrents) {
+      final prev = _torrentUniversalByHash[t.hash];
+      final m = t.toTorrentModel(previous: prev);
+      out.add(m);
+      next[t.hash] = m;
+    }
+    _torrentUniversalByHash
+      ..clear()
+      ..addAll(next);
+    return out;
+  }
 
   /// 获取日志
   /// [normal] 是否包含普通日志

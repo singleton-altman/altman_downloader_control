@@ -52,6 +52,7 @@ class TransmissionService {
     'secondsSeeding',
     'trackerStats', // 只获取统计信息，不获取完整tracker列表
     'labels',
+    'addedDate',
   ];
 
   // 完整字段列表（用于详情页面）
@@ -66,7 +67,6 @@ class TransmissionService {
     'rateUpload',
     'eta',
     'uploadRatio',
-    'dateAdded',
     'downloadDir',
     'error',
     'errorString',
@@ -107,6 +107,7 @@ class TransmissionService {
     'corruptEver',
     'trackers',
     'labels',
+    'addedDate',
     // 注意：不包含 pieces 和 piecesArray，这些字段对于大量数据会占用大量内存
   ];
 
@@ -259,7 +260,7 @@ class TransmissionService {
       state: state,
       category: torrent.labels?.isNotEmpty == true ? torrent.labels!.first : '',
       tags: torrent.labels ?? const [], // 使用const空列表减少内存
-      addedOn: torrent.dateCreated ?? 0,
+      addedOn: torrent.addedDate ?? 0,
       completionOn: torrent.dateDone ?? 0,
       lastActivity: torrent.dateActive ?? 0,
       seenComplete: isComplete ? sizeInt : 0,
@@ -683,7 +684,7 @@ class TransmissionService {
     }
 
     return QBTorrentPropertiesModel(
-      additionDate: torrent.dateCreated ?? 0,
+      additionDate: torrent.addedDate ?? 0,
       comment: torrent.comment ?? '',
       completionDate: torrent.dateDone ?? 0,
       createdBy: torrent.creator ?? '',

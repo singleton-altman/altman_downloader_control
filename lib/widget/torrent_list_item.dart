@@ -272,42 +272,30 @@ class TorrentListItem extends StatelessWidget {
           Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              if (speedItems.isNotEmpty)
-                Expanded(
-                  child: Align(
-                    alignment: Alignment.centerLeft,
-                    child: Wrap(
-                      spacing: 12,
-                      runSpacing: 4,
-                      crossAxisAlignment: WrapCrossAlignment.center,
-                      children: speedItems,
-                    ),
-                  ),
-                )
-              else
-                Expanded(
-                  child: RichText(
-                    text: TextSpan(
-                      children: [
-                        TextSpan(
-                          text: '当前进度: ',
-                          style: textTheme.bodySmall?.copyWith(
-                            color: colorScheme.onSurfaceVariant,
-                            fontSize: 11.5,
-                          ),
+              Expanded(
+                child: RichText(
+                  text: TextSpan(
+                    children: [
+                      TextSpan(
+                        text: '当前进度: ',
+                        style: textTheme.bodySmall?.copyWith(
+                          color: colorScheme.onSurfaceVariant,
+                          fontSize: 11.5,
                         ),
-                        TextSpan(
-                          text: progressLabel,
-                          style: textTheme.bodySmall?.copyWith(
-                            color: colorScheme.primary,
-                            fontSize: 11.5,
-                            fontWeight: FontWeight.w800,
-                          ),
+                      ),
+                      TextSpan(
+                        text: progressLabel,
+                        style: textTheme.bodySmall?.copyWith(
+                          color: colorScheme.primary,
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w800,
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
                 ),
+              ),
+              if (speedItems.isNotEmpty) ...speedItems,
             ],
           ),
           const SizedBox(height: 6),

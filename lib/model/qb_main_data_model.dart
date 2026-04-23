@@ -13,6 +13,9 @@ class QBMainDataModel {
   /// 变更的种子列表（以 hash 为 key）
   final Map<String, QBTorrentModel> torrents;
 
+  /// 与 [torrents] 同 key，值为本次 maindata 下发的原始字段（仅含变更项，用于合并时判断是否覆盖）
+  final Map<String, Map<String, dynamic>> torrentDeltas;
+
   /// 被移除的种子 hash 列表
   final List<String> torrentsRemoved;
 
@@ -23,6 +26,7 @@ class QBMainDataModel {
     required this.rid,
     required this.fullUpdate,
     required this.torrents,
+    required this.torrentDeltas,
     required this.torrentsRemoved,
     this.serverState,
   });
@@ -30,11 +34,12 @@ class QBMainDataModel {
   factory QBMainDataModel.fromJson(Map<String, dynamic> json) {
     // 解析 torrents 对象
     final Map<String, QBTorrentModel> torrentsMap = {};
+    final Map<String, Map<String, dynamic>> deltasMap = {};
     if (json['torrents'] is Map) {
       final torrentsData = json['torrents'] as Map<String, dynamic>;
       torrentsData.forEach((hash, data) {
         if (data is Map<String, dynamic>) {
-          // 添加 hash 字段到数据中
+          deltasMap[hash] = Map<String, dynamic>.from(data);
           final torrentData = Map<String, dynamic>.from(data);
           torrentData['hash'] = hash;
           try {
@@ -70,6 +75,7 @@ class QBMainDataModel {
       rid: (json['rid'] as num?)?.toInt() ?? 0,
       fullUpdate: json['full_update'] as bool? ?? false,
       torrents: torrentsMap,
+      torrentDeltas: deltasMap,
       torrentsRemoved: removed,
       serverState: serverState,
     );

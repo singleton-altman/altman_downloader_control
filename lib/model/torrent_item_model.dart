@@ -85,49 +85,143 @@ class TorrentModel {
     required this.seedingTime,
   });
 
-  /// 从 QBTorrentModel 转换
-  factory TorrentModel.fromQBTorrentModel(dynamic qbTorrent) {
+  /// 从 QBTorrentModel 转换；[previous] 存在时对空字段与未携带的可选指标沿用历史值
+  factory TorrentModel.fromQBTorrentModel(
+    dynamic qbTorrent, {
+    TorrentModel? previous,
+  }) {
+    final p = previous;
+    if (p == null) {
+      return TorrentModel(
+        hash: qbTorrent.hash,
+        name: qbTorrent.name,
+        size: qbTorrent.size,
+        totalSize: qbTorrent.totalSize,
+        progress: qbTorrent.progress,
+        dlspeed: qbTorrent.dlspeed,
+        upspeed: qbTorrent.upspeed,
+        priority: qbTorrent.priority,
+        numSeeds: qbTorrent.numSeeds,
+        numLeechers: qbTorrent.numLeechers,
+        numComplete: qbTorrent.numComplete,
+        numIncomplete: qbTorrent.numIncomplete,
+        ratio: qbTorrent.ratio,
+        popularity: qbTorrent.popularity,
+        eta: qbTorrent.eta,
+        state: qbTorrent.state,
+        category: qbTorrent.category,
+        tags: qbTorrent.tags,
+        addedOn: qbTorrent.addedOn,
+        completionOn: qbTorrent.completionOn,
+        lastActivity: qbTorrent.lastActivity,
+        seenComplete: qbTorrent.seenComplete,
+        savePath: qbTorrent.savePath,
+        contentPath: qbTorrent.contentPath,
+        downloadPath: qbTorrent.downloadPath,
+        rootPath: qbTorrent.rootPath,
+        downloaded: qbTorrent.downloaded,
+        completed: qbTorrent.completed,
+        uploaded: qbTorrent.uploaded,
+        downloadedSession: qbTorrent.downloadedSession,
+        uploadedSession: qbTorrent.uploadedSession,
+        amountLeft: qbTorrent.amountLeft,
+        tracker: qbTorrent.tracker,
+        comment: qbTorrent.comment,
+        magnetUri: qbTorrent.magnetUri,
+        availability: qbTorrent.availability,
+        dlLimit: qbTorrent.dlLimit,
+        upLimit: qbTorrent.upLimit,
+        timeActive: qbTorrent.timeActive,
+        seedingTime: qbTorrent.seedingTime,
+      );
+    }
+
+    final qHash = qbTorrent.hash as String? ?? '';
+    final qName = qbTorrent.name as String? ?? '';
+    final qSize = (qbTorrent.size as num?)?.toInt() ?? 0;
+    final qTotal = (qbTorrent.totalSize as num?)?.toInt() ?? 0;
+    final qProgress = (qbTorrent.progress as num?)?.toDouble() ?? 0.0;
+    final qNumComplete = (qbTorrent.numComplete as num?)?.toInt() ?? 0;
+    final qNumIncomplete = (qbTorrent.numIncomplete as num?)?.toInt() ?? 0;
+    final qState = qbTorrent.state as String? ?? '';
+    final qCategory = qbTorrent.category as String? ?? '';
+    final qTags = qbTorrent.tags is List
+        ? (qbTorrent.tags as List).map((e) => e.toString()).toList()
+        : <String>[];
+    final qAddedOn = (qbTorrent.addedOn as num?)?.toInt() ?? 0;
+    final qSavePath = qbTorrent.savePath as String? ?? '';
+    final qContentPath = qbTorrent.contentPath as String? ?? '';
+    final qDownloadPath = qbTorrent.downloadPath as String? ?? '';
+    final qRootPath = qbTorrent.rootPath as String? ?? '';
+    final qTracker = qbTorrent.tracker as String? ?? '';
+    final qComment = qbTorrent.comment as String? ?? '';
+    final qMagnetUri = qbTorrent.magnetUri as String? ?? '';
+    final hasPopularityField = qbTorrent.hasPopularityField == true;
+    final hasAvailabilityField = qbTorrent.hasAvailabilityField == true;
+
     return TorrentModel(
-      hash: qbTorrent.hash,
-      name: qbTorrent.name,
-      size: qbTorrent.size,
-      totalSize: qbTorrent.totalSize,
-      progress: qbTorrent.progress,
-      dlspeed: qbTorrent.dlspeed,
-      upspeed: qbTorrent.upspeed,
-      priority: qbTorrent.priority,
-      numSeeds: qbTorrent.numSeeds,
-      numLeechers: qbTorrent.numLeechers,
-      numComplete: qbTorrent.numComplete,
-      numIncomplete: qbTorrent.numIncomplete,
-      ratio: qbTorrent.ratio,
-      popularity: qbTorrent.popularity,
-      eta: qbTorrent.eta,
-      state: qbTorrent.state,
-      category: qbTorrent.category,
-      tags: qbTorrent.tags,
-      addedOn: qbTorrent.addedOn,
-      completionOn: qbTorrent.completionOn,
-      lastActivity: qbTorrent.lastActivity,
-      seenComplete: qbTorrent.seenComplete,
-      savePath: qbTorrent.savePath,
-      contentPath: qbTorrent.contentPath,
-      downloadPath: qbTorrent.downloadPath,
-      rootPath: qbTorrent.rootPath,
-      downloaded: qbTorrent.downloaded,
-      completed: qbTorrent.completed,
-      uploaded: qbTorrent.uploaded,
-      downloadedSession: qbTorrent.downloadedSession,
-      uploadedSession: qbTorrent.uploadedSession,
-      amountLeft: qbTorrent.amountLeft,
-      tracker: qbTorrent.tracker,
-      comment: qbTorrent.comment,
-      magnetUri: qbTorrent.magnetUri,
-      availability: qbTorrent.availability,
-      dlLimit: qbTorrent.dlLimit,
-      upLimit: qbTorrent.upLimit,
-      timeActive: qbTorrent.timeActive,
-      seedingTime: qbTorrent.seedingTime,
+      hash: qHash.isNotEmpty ? qHash : p.hash,
+      name: (qName.isNotEmpty || p.name.isEmpty) ? qName : p.name,
+      size: (qSize > 0 || p.size == 0) ? qSize : p.size,
+      totalSize: (qTotal > 0 || p.totalSize == 0)
+          ? qTotal
+          : (p.totalSize > 0 ? p.totalSize : qSize),
+      progress: (qProgress > 0 || p.progress == 0) ? qProgress : p.progress,
+      dlspeed: (qbTorrent.dlspeed as num?)?.toInt() ?? 0,
+      upspeed: (qbTorrent.upspeed as num?)?.toInt() ?? 0,
+      priority: (qbTorrent.priority as num?)?.toInt() ?? 0,
+      numSeeds: (qbTorrent.numSeeds as num?)?.toInt() ?? 0,
+      numLeechers: (qbTorrent.numLeechers as num?)?.toInt() ?? 0,
+      numComplete: (qNumComplete >= 0) ? qNumComplete : p.numComplete,
+      numIncomplete: (qNumIncomplete >= 0) ? qNumIncomplete : p.numIncomplete,
+      ratio: (qbTorrent.ratio as num?)?.toDouble() ?? 0.0,
+      popularity: hasPopularityField
+          ? ((qbTorrent.popularity as num?)?.toDouble() ?? 0.0)
+          : p.popularity,
+      eta: (qbTorrent.eta as num?)?.toInt() ?? 0,
+      state: qState.isNotEmpty ? qState : p.state,
+      category: (qCategory.isNotEmpty || p.category.isEmpty)
+          ? qCategory
+          : p.category,
+      tags: qTags.isNotEmpty || p.tags.isEmpty ? qTags : p.tags,
+      addedOn: (qAddedOn > 0 || p.addedOn == 0) ? qAddedOn : p.addedOn,
+      completionOn: (qbTorrent.completionOn as num?)?.toInt() ?? 0,
+      lastActivity: (qbTorrent.lastActivity as num?)?.toInt() ?? 0,
+      seenComplete: (qbTorrent.seenComplete as num?)?.toInt() ?? 0,
+      savePath: (qSavePath.isNotEmpty || p.savePath.isEmpty)
+          ? qSavePath
+          : p.savePath,
+      contentPath: (qContentPath.isNotEmpty || p.contentPath.isEmpty)
+          ? qContentPath
+          : p.contentPath,
+      downloadPath: (qDownloadPath.isNotEmpty || p.downloadPath.isEmpty)
+          ? qDownloadPath
+          : p.downloadPath,
+      rootPath: (qRootPath.isNotEmpty || p.rootPath.isEmpty)
+          ? qRootPath
+          : p.rootPath,
+      downloaded: (qbTorrent.downloaded as num?)?.toInt() ?? 0,
+      completed: (qbTorrent.completed as num?)?.toInt() ?? 0,
+      uploaded: (qbTorrent.uploaded as num?)?.toInt() ?? 0,
+      downloadedSession: (qbTorrent.downloadedSession as num?)?.toInt() ?? 0,
+      uploadedSession: (qbTorrent.uploadedSession as num?)?.toInt() ?? 0,
+      amountLeft: (qbTorrent.amountLeft as num?)?.toInt() ?? 0,
+      tracker: (qTracker.isNotEmpty || p.tracker.isEmpty)
+          ? qTracker
+          : p.tracker,
+      comment: (qComment.isNotEmpty || p.comment.isEmpty)
+          ? qComment
+          : p.comment,
+      magnetUri: (qMagnetUri.isNotEmpty || p.magnetUri.isEmpty)
+          ? qMagnetUri
+          : p.magnetUri,
+      availability: hasAvailabilityField
+          ? ((qbTorrent.availability as num?)?.toDouble() ?? 0.0)
+          : p.availability,
+      dlLimit: (qbTorrent.dlLimit as num?)?.toDouble() ?? 0.0,
+      upLimit: (qbTorrent.upLimit as num?)?.toDouble() ?? 0.0,
+      timeActive: (qbTorrent.timeActive as num?)?.toDouble() ?? 0.0,
+      seedingTime: (qbTorrent.seedingTime as num?)?.toInt() ?? 0,
     );
   }
 
