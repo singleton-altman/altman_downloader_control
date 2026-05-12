@@ -1,17 +1,36 @@
+import 'package:adaptive_platform_ui/adaptive_platform_ui.dart';
 import 'package:altman_downloader_control/controller/protocol.dart';
 import 'package:altman_downloader_control/controller/qbittorrent/qb_controller.dart';
 import 'package:altman_downloader_control/model/torrent_item_model.dart';
 import 'package:altman_downloader_control/page/torrent_detail_sheet.dart';
+import 'package:altman_downloader_control/theme/downloader_adaptive_config.dart';
 import 'package:altman_downloader_control/utils/toast_utils.dart';
 import 'package:altman_downloader_control/utils/torrent_state_localizable.dart';
 import 'package:altman_downloader_control/widget/input_dialog.dart'
     hide showMSInputDialog;
 import 'package:altman_downloader_control/widget/qbittorrent/qb_category_picker.dart';
 import 'package:altman_downloader_control/widget/qbittorrent/qb_tag_picker.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:collection/collection.dart';
 
 import '../utils/string_utils.dart';
+
+class _TorrentActionMenuItem {
+  final String action;
+  final String label;
+  final IconData icon;
+  final bool isDefaultAction;
+  final bool isDestructiveAction;
+
+  const _TorrentActionMenuItem(
+    this.action,
+    this.label, {
+    required this.icon,
+    this.isDefaultAction = false,
+    this.isDestructiveAction = false,
+  });
+}
 
 /// 通用的种子列表项组件
 /// 支持所有下载器类型（qBittorrent、Transmission 等），统一 UI 体验
@@ -49,6 +68,20 @@ class TorrentListItem extends StatelessWidget {
     final stateColor = _getStateColor(colorScheme);
     final totalSize = (torrent.totalSize > 0 ? torrent.totalSize : torrent.size)
         .toHumanReadableFileSize();
+    final baseTint = isDark ? const Color(0xFF1C1C1E) : Colors.white;
+    final fillAlpha = isDark ? 0.5 : 0.62;
+    final cardFill = PlatformInfo.isIOS && selected
+        ? Color.alphaBlend(
+            colorScheme.primary.withValues(alpha: 0.22),
+            baseTint.withValues(alpha: fillAlpha),
+          )
+        : baseTint.withValues(alpha: fillAlpha);
+    final borderSide = BorderSide(
+      color: selected
+          ? colorScheme.primary
+          : stateColor.withValues(alpha: isDark ? 0.18 : 0.12),
+      width: selected ? 1.8 : 0.6,
+    );
     final metricTiles = <Widget>[
       _buildMetricTile(
         context: context,
@@ -94,130 +127,135 @@ class TorrentListItem extends StatelessWidget {
         ),
     ];
 
-    return InkWell(
-      onTap: () {
-        if (selectionMode) {
-          onToggleSelected?.call();
-        } else {
-          _showTorrentDetails(context);
-        }
-      },
-      onLongPress: selectionMode || onLongPressEnterSelect == null
-          ? null
-          : () => onLongPressEnterSelect!(),
-      borderRadius: BorderRadius.circular(16),
-      child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(14),
-          color: isDark
-              ? colorScheme.surfaceContainerHighest.withValues(alpha: 0.5)
-              : colorScheme.surface,
-          border: Border.all(
-            color: selected
-                ? colorScheme.primary
-                : stateColor.withValues(alpha: isDark ? 0.18 : 0.12),
-            width: selected ? 1.8 : 0.7,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: colorScheme.shadow.withValues(
-                alpha: isDark ? 0.12 : 0.035,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final itemWidth = constraints.hasBoundedWidth
+            ? constraints.maxWidth
+            : MediaQuery.sizeOf(context).width;
+        final item = SizedBox(
+          width: itemWidth,
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: () {
+              if (selectionMode) {
+                onToggleSelected?.call();
+              } else {
+                _showTorrentDetails(context);
+              }
+            },
+            child: Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: 16.0,
+                vertical: 5.0,
               ),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 10.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    child: Text(
-                      torrent.name.trim().isEmpty ? '未命名任务' : torrent.name,
-                      style: textTheme.titleSmall?.copyWith(
-                        color: colorScheme.onSurface,
-                        fontWeight: FontWeight.w700,
-                        fontSize: 14,
-                        height: 1.2,
+              child: AdaptiveCard(
+                margin: EdgeInsets.zero,
+                borderRadius: BorderRadius.circular(16),
+                elevation: 0,
+                color: cardFill,
+                shape: PlatformInfo.isIOS
+                    ? null
+                    : RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        side: borderSide,
                       ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12.0,
+                  vertical: 10.0,
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Text(
+                            torrent.name.trim().isEmpty
+                                ? '未命名任务'
+                                : torrent.name,
+                            style: textTheme.titleSmall?.copyWith(
+                              color: colorScheme.onSurface,
+                              fontWeight: FontWeight.w700,
+                              fontSize: 14,
+                              height: 1.12,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
                     ),
-                  ),
-                  if (!selectionMode) ...[
-                    const SizedBox(width: 12),
-                    Padding(
-                      padding: const EdgeInsets.only(top: 2),
-                      child: _buildActionMenu(context),
+                    const SizedBox(height: 6),
+                    Wrap(
+                      spacing: 5,
+                      runSpacing: 3,
+                      children: [
+                        _buildMetaChip(
+                          context: context,
+                          icon: Icons.satellite_outlined,
+                          text: _getStateText(),
+                          color: stateColor,
+                        ),
+                        if (torrent.category.isNotEmpty)
+                          _buildMetaChip(
+                            context: context,
+                            icon: Icons.folder_outlined,
+                            text: torrent.category,
+                            color: colorScheme.primary,
+                          ),
+                        if (torrent.tags.isNotEmpty)
+                          _buildMetaChip(
+                            context: context,
+                            icon: Icons.sell_outlined,
+                            text: torrent.tags.join(' / '),
+                            color: colorScheme.secondary,
+                            maxWidth: MediaQuery.of(context).size.width * 0.45,
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    _buildProgressPanel(
+                      context: context,
+                      progressPercent: progressPercent,
+                      progressLabel: progressLabel,
+                      stateColor: stateColor,
+                    ),
+                    const SizedBox(height: 6),
+                    _buildMetricsSection(context: context, items: metricTiles),
+                    const SizedBox(height: 5),
+                    Wrap(
+                      spacing: 7,
+                      runSpacing: 2,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      children: [
+                        _buildFooterMeta(
+                          context: context,
+                          icon: Icons.access_time_rounded,
+                          text: _formatTimestamp(torrent.addedOn),
+                        ),
+                        _buildFooterMeta(
+                          context: context,
+                          icon: Icons.hub_outlined,
+                          text:
+                              '做种 ${torrent.numComplete} / 下载 ${torrent.numIncomplete}',
+                        ),
+                      ],
                     ),
                   ],
-                ],
+                ),
               ),
-              Wrap(
-                spacing: 6,
-                runSpacing: 4,
-                children: [
-                  _buildMetaChip(
-                    context: context,
-                    icon: Icons.satellite_outlined,
-                    text: _getStateText(),
-                    color: stateColor,
-                  ),
-                  if (torrent.category.isNotEmpty)
-                    _buildMetaChip(
-                      context: context,
-                      icon: Icons.folder_outlined,
-                      text: torrent.category,
-                      color: colorScheme.primary,
-                    ),
-                  if (torrent.tags.isNotEmpty)
-                    _buildMetaChip(
-                      context: context,
-                      icon: Icons.sell_outlined,
-                      text: torrent.tags.join(' / '),
-                      color: colorScheme.secondary,
-                      maxWidth: MediaQuery.of(context).size.width * 0.45,
-                    ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              _buildProgressPanel(
-                context: context,
-                progressPercent: progressPercent,
-                progressLabel: progressLabel,
-                stateColor: stateColor,
-              ),
-              const SizedBox(height: 8),
-              _buildMetricsSection(context: context, items: metricTiles),
-              const SizedBox(height: 5),
-              Wrap(
-                spacing: 7,
-                runSpacing: 2,
-                crossAxisAlignment: WrapCrossAlignment.center,
-                children: [
-                  _buildFooterMeta(
-                    context: context,
-                    icon: Icons.access_time_rounded,
-                    text: _formatTimestamp(torrent.addedOn),
-                  ),
-                  _buildFooterMeta(
-                    context: context,
-                    icon: Icons.hub_outlined,
-                    text:
-                        '做种 ${torrent.numComplete} / 下载 ${torrent.numIncomplete}',
-                  ),
-                ],
-              ),
-            ],
+            ),
           ),
-        ),
-      ),
+        );
+
+        if (selectionMode) return item;
+        return AdaptiveContextMenu(
+          actions: _buildContextMenuActions(context),
+          child: item,
+        );
+      },
     );
   }
 
@@ -320,12 +358,12 @@ class TorrentListItem extends StatelessWidget {
     final textTheme = Theme.of(context).textTheme;
     final color = accentColor ?? colorScheme.onSurfaceVariant;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: colorScheme.surface.withValues(
+        color: colorScheme.surfaceContainerHigh.withValues(
           alpha: isDarkTheme(context) ? 0.28 : 0.82,
         ),
-        borderRadius: BorderRadius.circular(7),
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(
           color: colorScheme.outlineVariant.withValues(
             alpha: isDarkTheme(context) ? 0.18 : 0.12,
@@ -370,14 +408,15 @@ class TorrentListItem extends StatelessWidget {
     final colorScheme = Theme.of(context).colorScheme;
     final isDark = isDarkTheme(context);
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 5),
       decoration: BoxDecoration(
         color: colorScheme.surfaceContainerHighest.withValues(
           alpha: isDark ? 0.2 : 0.14,
         ),
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(12),
       ),
-      child: Wrap(spacing: 5, runSpacing: 5, children: items),
+      child: Wrap(spacing: 4, runSpacing: 4, children: items),
     );
   }
 
@@ -455,19 +494,19 @@ class TorrentListItem extends StatelessWidget {
     final textTheme = Theme.of(context).textTheme;
     return Container(
       constraints: maxWidth == null
-          ? const BoxConstraints(minHeight: 24)
-          : BoxConstraints(minHeight: 24, maxWidth: maxWidth),
-      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+          ? const BoxConstraints(minHeight: 20)
+          : BoxConstraints(minHeight: 20, maxWidth: maxWidth),
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(7),
-        border: Border.all(color: color.withValues(alpha: 0.14), width: 0.6),
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color.withValues(alpha: 0.18), width: 0.6),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 13, color: color),
-          const SizedBox(width: 5),
+          Icon(icon, size: 12, color: color),
+          const SizedBox(width: 4),
           Flexible(
             child: Text(
               text,
@@ -486,6 +525,7 @@ class TorrentListItem extends StatelessWidget {
     );
   }
 
+  // ignore: unused_element
   Widget _buildStateBadge({
     required BuildContext context,
     required Color stateColor,
@@ -496,7 +536,7 @@ class TorrentListItem extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
       decoration: BoxDecoration(
         color: stateColor.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(7),
+        borderRadius: BorderRadius.circular(8),
       ),
       child: Text(
         label,
@@ -512,179 +552,100 @@ class TorrentListItem extends StatelessWidget {
     );
   }
 
-  Widget _buildActionMenu(BuildContext context) {
-    return PopupMenuButton<String>(
-      icon: Container(
-        padding: const EdgeInsets.all(4),
-        decoration: BoxDecoration(
-          color: Theme.of(
-            context,
-          ).colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
-          borderRadius: BorderRadius.circular(6),
+  List<AdaptiveContextMenuAction> _buildContextMenuActions(
+    BuildContext context,
+  ) {
+    return [
+      for (final item in _actionMenuItems)
+        AdaptiveContextMenuAction(
+          icon: item.icon,
+          isDestructive: item.isDestructiveAction,
+          onPressed: () {
+            _handleMenuAction(context, item.action);
+          },
+          title: item.label,
         ),
-        child: Icon(
-          Icons.more_vert,
-          size: 16,
-          color: Theme.of(
-            context,
-          ).colorScheme.onSurfaceVariant.withValues(alpha: 0.8),
+    ];
+  }
+
+  Future<void> _showIosTorrentActionSheet(BuildContext context) async {
+    final actions = _buildContextMenuActions(context);
+    await showCupertinoModalPopup<void>(
+      context: context,
+      builder: (ctx) => CupertinoActionSheet(
+        title: Text(
+          torrent.name.trim().isEmpty ? '未命名任务' : torrent.name,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+        ),
+        actions: [
+          for (final a in actions)
+            CupertinoActionSheetAction(
+              onPressed: () {
+                Navigator.of(ctx).pop();
+                a.onPressed();
+              },
+              isDestructiveAction: a.isDestructive,
+              child: Text(a.title),
+            ),
+        ],
+        cancelButton: CupertinoActionSheetAction(
+          onPressed: () => Navigator.of(ctx).pop(),
+          child: const Text('取消'),
         ),
       ),
-      padding: EdgeInsets.zero,
-      constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      onSelected: (value) => _handleMenuAction(context, value),
-      itemBuilder: (context) => [
-        // 停止
-        PopupMenuItem(
-          value: 'pause',
-          child: Row(
-            children: [
-              Icon(Icons.pause, size: 18, color: Colors.orange.shade600),
-              const SizedBox(width: 12),
-              Text('停止', style: Theme.of(context).textTheme.bodyMedium),
-            ],
-          ),
-        ),
-        // 启动
-        PopupMenuItem(
-          value: 'resume',
-          child: Row(
-            children: [
-              Icon(Icons.play_arrow, size: 18, color: Colors.green.shade600),
-              const SizedBox(width: 12),
-              Text('启动', style: Theme.of(context).textTheme.bodyMedium),
-            ],
-          ),
-        ),
-        // 强制启动
-        PopupMenuItem(
-          value: 'forceResume',
-          child: Row(
-            children: [
-              Icon(
-                Icons.play_circle_outline,
-                size: 18,
-                color: Colors.blue.shade600,
-              ),
-              const SizedBox(width: 12),
-              Text('强制启动', style: Theme.of(context).textTheme.bodyMedium),
-            ],
-          ),
-        ),
-        // 强制重新校验
-        PopupMenuItem(
-          value: 'recheck',
-          child: Row(
-            children: [
-              Icon(
-                Icons.verified_outlined,
-                size: 18,
-                color: Colors.amber.shade700,
-              ),
-              const SizedBox(width: 12),
-              Text('强制重新校验', style: Theme.of(context).textTheme.bodyMedium),
-            ],
-          ),
-        ),
-        const PopupMenuDivider(),
-        // 设置保存地址
-        PopupMenuItem(
-          value: 'setLocation',
-          child: Row(
-            children: [
-              Icon(
-                Icons.folder_outlined,
-                size: 18,
-                color: Colors.purple.shade600,
-              ),
-              const SizedBox(width: 12),
-              Text('设置保存地址', style: Theme.of(context).textTheme.bodyMedium),
-            ],
-          ),
-        ),
-        // 重命名
-        PopupMenuItem(
-          value: 'rename',
-          child: Row(
-            children: [
-              Icon(Icons.edit, size: 18, color: Colors.indigo.shade600),
-              const SizedBox(width: 12),
-              Text('重命名', style: Theme.of(context).textTheme.bodyMedium),
-            ],
-          ),
-        ),
-        // 设置分类
-        PopupMenuItem(
-          value: 'setCategory',
-          child: Row(
-            children: [
-              Icon(Icons.category, size: 18, color: Colors.pink.shade600),
-              const SizedBox(width: 12),
-              Text('设置分类', style: Theme.of(context).textTheme.bodyMedium),
-            ],
-          ),
-        ),
-        // 设置标签
-        PopupMenuItem(
-          value: 'setTags',
-          child: Row(
-            children: [
-              Icon(Icons.label, size: 18, color: Colors.purple.shade600),
-              const SizedBox(width: 12),
-              Text('设置标签', style: Theme.of(context).textTheme.bodyMedium),
-            ],
-          ),
-        ),
-        const PopupMenuDivider(),
-        // 限制下载速度
-        PopupMenuItem(
-          value: 'setDownloadLimit',
-          child: Row(
-            children: [
-              Icon(Icons.download, size: 18, color: Colors.blue.shade600),
-              const SizedBox(width: 12),
-              Text('限制下载速度', style: Theme.of(context).textTheme.bodyMedium),
-            ],
-          ),
-        ),
-        // 限制上传速度
-        PopupMenuItem(
-          value: 'setUploadLimit',
-          child: Row(
-            children: [
-              Icon(Icons.upload, size: 18, color: Colors.teal.shade600),
-              const SizedBox(width: 12),
-              Text('限制上传速度', style: Theme.of(context).textTheme.bodyMedium),
-            ],
-          ),
-        ),
-        const PopupMenuDivider(),
-        // 删除
-        PopupMenuItem(
-          value: 'delete',
-          child: Row(
-            children: [
-              Icon(Icons.delete_outline, size: 18, color: Colors.red.shade600),
-              const SizedBox(width: 12),
-              Text('删除', style: Theme.of(context).textTheme.bodyMedium),
-            ],
-          ),
-        ),
-        // 删除（包含文件）
-        PopupMenuItem(
-          value: 'deleteWithFiles',
-          child: Row(
-            children: [
-              Icon(Icons.delete_forever, size: 18, color: Colors.red.shade700),
-              const SizedBox(width: 12),
-              Text('删除（包含文件）', style: Theme.of(context).textTheme.bodyMedium),
-            ],
-          ),
-        ),
-      ],
     );
   }
+
+  static const List<_TorrentActionMenuItem> _actionMenuItems = [
+    _TorrentActionMenuItem('pause', '停止', icon: CupertinoIcons.pause_fill),
+    _TorrentActionMenuItem(
+      'resume',
+      '启动',
+      icon: CupertinoIcons.play_fill,
+      isDefaultAction: true,
+    ),
+    _TorrentActionMenuItem(
+      'forceResume',
+      '强制启动',
+      icon: CupertinoIcons.play_circle,
+    ),
+    _TorrentActionMenuItem(
+      'recheck',
+      '强制重新校验',
+      icon: CupertinoIcons.checkmark_shield,
+    ),
+    _TorrentActionMenuItem(
+      'setLocation',
+      '设置保存地址',
+      icon: CupertinoIcons.folder,
+    ),
+    _TorrentActionMenuItem('rename', '重命名', icon: CupertinoIcons.pencil),
+    _TorrentActionMenuItem('setCategory', '设置分类', icon: CupertinoIcons.tray),
+    _TorrentActionMenuItem('setTags', '设置标签', icon: CupertinoIcons.tag),
+    _TorrentActionMenuItem(
+      'setDownloadLimit',
+      '限制下载速度',
+      icon: CupertinoIcons.arrow_down_circle,
+    ),
+    _TorrentActionMenuItem(
+      'setUploadLimit',
+      '限制上传速度',
+      icon: CupertinoIcons.arrow_up_circle,
+    ),
+    _TorrentActionMenuItem(
+      'delete',
+      '删除',
+      icon: CupertinoIcons.delete,
+      isDestructiveAction: true,
+    ),
+    _TorrentActionMenuItem(
+      'deleteWithFiles',
+      '删除（包含文件）',
+      icon: CupertinoIcons.delete_solid,
+      isDestructiveAction: true,
+    ),
+  ];
 
   void _handleMenuAction(BuildContext context, String action) {
     switch (action) {
@@ -1058,10 +1019,20 @@ class TorrentListItem extends StatelessWidget {
     } else if (state == 'downloading') {
       // 下载中使用主题主色
       return colorScheme.primary;
-    } else if (state == 'seeding' || state == 'uploading') {
+    } else if (state == 'seeding' ||
+        state == 'uploading' ||
+        state == 'queuedup' ||
+        state == 'queueddl' ||
+        state == 'forcedup' ||
+        state == 'forceddl') {
       // 做种 / 上传中 使用相同的辅助色
       return colorScheme.tertiary;
-    } else if (state == 'paused' || state == 'stopped') {
+    } else if (state == 'paused' ||
+        state == 'stopped' ||
+        state == 'pausedup' ||
+        state == 'pauseddl' ||
+        state == 'stoppedup' ||
+        state == 'stoppeddl') {
       // 暂停/停止使用次要文字色
       return colorScheme.onSurfaceVariant;
     }
@@ -1136,9 +1107,13 @@ class TorrentListItem extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
-                  IconButton(
-                    icon: const Icon(Icons.close),
+                  AdaptiveButton.icon(
+                    useNative:
+                        DownloaderAdaptiveConfig.useNativeIos26Chrome,
                     onPressed: () => Navigator.pop(context),
+                    icon: Icons.close,
+                    style: AdaptiveButtonStyle.plain,
+                    size: AdaptiveButtonSize.small,
                   ),
                 ],
               ),
