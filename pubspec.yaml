@@ -1,6 +1,6 @@
 name: altman_downloader_control
 description: A new Flutter module project.
-version: 1.0.2+3
+version: 1.0.3+4
 environment:
   sdk: '>=3.8.0 <4.0.0'
 dependencies:
@@ -25,6 +25,9 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^6.0.0
+  build_runner: ^2.4.13
+  freezed: ^2.5.7
+  json_serializable: ^6.8.0
 flutter:
   uses-material-design: true
   module:

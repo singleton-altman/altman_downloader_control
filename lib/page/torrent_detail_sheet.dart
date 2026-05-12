@@ -142,94 +142,83 @@ class _QbTorrentDetailSheetState extends State<QbTorrentDetailSheet> {
       builder: (context, scrollController) {
         return Container(
           decoration: BoxDecoration(
-            color: Theme.of(context).scaffoldBackgroundColor,
-            borderRadius: const BorderRadius.only(
-              topLeft: Radius.circular(20),
-              topRight: Radius.circular(20),
+            color: Theme.of(context).colorScheme.surface,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+            border: Border.all(
+              color: Theme.of(context)
+                  .colorScheme
+                  .outlineVariant
+                  .withValues(alpha: 0.45),
+              width: 0.6,
             ),
+            boxShadow: [
+              BoxShadow(
+                color: Theme.of(context)
+                    .colorScheme
+                    .shadow
+                    .withValues(alpha: 0.22),
+                blurRadius: 28,
+                offset: const Offset(0, -6),
+              ),
+            ],
           ),
           child: Column(
             children: [
-              // 顶部拖拽指示器
               Container(
-                margin: const EdgeInsets.only(top: 12, bottom: 8),
-                width: 40,
-                height: 4,
+                margin: const EdgeInsets.only(top: 10, bottom: 6),
+                width: 48,
+                height: 5,
                 decoration: BoxDecoration(
-                  color: Theme.of(
-                    context,
-                  ).colorScheme.onSurfaceVariant.withValues(alpha: 0.3),
-                  borderRadius: BorderRadius.circular(2),
+                  borderRadius: BorderRadius.circular(100),
+                  color: Theme.of(context)
+                      .colorScheme
+                      .onSurfaceVariant
+                      .withValues(alpha: 0.38),
                 ),
               ),
-              // 标题栏
               Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 8,
-                ),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        widget.name,
-                        style: Theme.of(context).textTheme.titleMedium
-                            ?.copyWith(fontWeight: FontWeight.w700),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
+                padding: const EdgeInsets.fromLTRB(8, 0, 4, 2),
+                child: Align(
+                  alignment: Alignment.centerRight,
+                  child: IconButton(
+                    style: IconButton.styleFrom(
+                      backgroundColor: Theme.of(context)
+                          .colorScheme
+                          .surfaceContainerHighest,
+                      foregroundColor:
+                          Theme.of(context).colorScheme.onSurface,
+                      minimumSize: const Size(40, 40),
+                      shape: const CircleBorder(),
                     ),
-                    IconButton(
-                      icon: const Icon(Icons.close),
-                      onPressed: () => Navigator.of(context).pop(),
-                      tooltip: '关闭',
-                    ),
-                  ],
+                    icon: const Icon(Icons.close_rounded, size: 22),
+                    onPressed: () => Navigator.of(context).pop(),
+                    tooltip: '关闭',
+                  ),
                 ),
               ),
-              // Segment Control
               Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 10,
-                ),
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
                 child: Obx(() {
                   final selectedValue = _selectedSegment.value;
+                  final cs = Theme.of(context).colorScheme;
                   return DecoratedBox(
                     decoration: BoxDecoration(
-                      color: Theme.of(context)
-                          .colorScheme
-                          .surfaceContainerHighest
-                          .withValues(alpha: 0.45),
-                      borderRadius: BorderRadius.circular(14),
+                      color: cs.surfaceContainerHighest.withValues(alpha: 0.5),
+                      borderRadius: BorderRadius.circular(12),
                       border: Border.all(
-                        color: Theme.of(
-                          context,
-                        ).colorScheme.outline.withValues(alpha: 0.08),
+                        color: cs.outlineVariant.withValues(alpha: 0.28),
                       ),
                     ),
                     child: Padding(
                       padding: const EdgeInsets.all(4),
                       child: CupertinoSlidingSegmentedControl<String>(
                         groupValue: selectedValue,
-                        thumbColor: Theme.of(context).colorScheme.surface,
+                        thumbColor: cs.primaryContainer,
                         backgroundColor: Colors.transparent,
                         children: {
-                          'general': _buildSegmentLabel(
-                            context,
-                            label: '基本信息',
-                            icon: Icons.info_outline_rounded,
-                          ),
-                          'tracker': _buildSegmentLabel(
-                            context,
-                            label: 'Tracker',
-                            icon: Icons.dns_rounded,
-                          ),
-                          'content': _buildSegmentLabel(
-                            context,
-                            label: '文件内容',
-                            icon: Icons.folder_outlined,
-                          ),
+                          'general': _buildSegmentLabel(context, '基本'),
+                          'tracker': _buildSegmentLabel(context, 'Tracker'),
+                          'content': _buildSegmentLabel(context, '文件'),
                         },
                         onValueChanged: (value) {
                           if (value != null) {
@@ -244,32 +233,80 @@ class _QbTorrentDetailSheetState extends State<QbTorrentDetailSheet> {
               // 内容区域
               Expanded(
                 child: _isLoading
-                    ? const Center(child: CircularProgressIndicator())
-                    : _errorMessage != null
                     ? Center(
                         child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
+                          mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(
-                              Icons.error_outline,
-                              size: 48,
-                              color: Theme.of(context).colorScheme.error,
+                            CircularProgressIndicator(
+                              color: Theme.of(context).colorScheme.primary,
+                              strokeWidth: 2.5,
                             ),
-                            const SizedBox(height: 16),
+                            const SizedBox(height: 18),
                             Text(
-                              _errorMessage!,
-                              style: Theme.of(context).textTheme.bodyMedium
+                              '加载详情…',
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodyMedium
                                   ?.copyWith(
-                                    color: Theme.of(context).colorScheme.error,
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .onSurfaceVariant,
+                                    fontWeight: FontWeight.w500,
                                   ),
                             ),
-                            const SizedBox(height: 16),
-                            ElevatedButton.icon(
-                              onPressed: _loadProperties,
-                              icon: const Icon(Icons.refresh),
-                              label: const Text('重试'),
-                            ),
                           ],
+                        ),
+                      )
+                    : _errorMessage != null
+                    ? Center(
+                        child: Padding(
+                          padding: const EdgeInsets.all(24),
+                          child: Container(
+                            padding: const EdgeInsets.all(22),
+                            decoration: BoxDecoration(
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .errorContainer
+                                  .withValues(alpha: 0.35),
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .outlineVariant
+                                    .withValues(alpha: 0.2),
+                              ),
+                            ),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.cloud_off_rounded,
+                                  size: 44,
+                                  color: Theme.of(context).colorScheme.error,
+                                ),
+                                const SizedBox(height: 14),
+                                Text(
+                                  _errorMessage!,
+                                  textAlign: TextAlign.center,
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .bodyMedium
+                                      ?.copyWith(
+                                        color: Theme.of(context)
+                                            .colorScheme
+                                            .onSurface,
+                                        height: 1.35,
+                                      ),
+                                ),
+                                const SizedBox(height: 20),
+                                FilledButton.tonalIcon(
+                                  onPressed: _loadProperties,
+                                  icon: const Icon(Icons.refresh_rounded),
+                                  label: const Text('重试'),
+                                ),
+                              ],
+                            ),
+                          ),
                         ),
                       )
                     : Obx(() {
@@ -293,36 +330,22 @@ class _QbTorrentDetailSheetState extends State<QbTorrentDetailSheet> {
     );
   }
 
-  Widget _buildSegmentLabel(
-    BuildContext context, {
-    required String label,
-    required IconData icon,
-  }) {
+  Widget _buildSegmentLabel(BuildContext context, String label) {
+    final scheme = Theme.of(context).colorScheme;
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            icon,
-            size: 15,
-            color: Theme.of(context).colorScheme.onSurfaceVariant,
-          ),
-          const SizedBox(width: 6),
-          Flexible(
-            child: Text(
-              label,
-              overflow: TextOverflow.ellipsis,
-              maxLines: 1,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 9),
+      child: Center(
+        child: Text(
+          label,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          textAlign: TextAlign.center,
+          style: Theme.of(context).textTheme.labelLarge?.copyWith(
                 fontWeight: FontWeight.w600,
                 fontSize: 13,
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                color: scheme.onSurface,
               ),
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -422,60 +445,6 @@ class _QbTorrentDetailSheetState extends State<QbTorrentDetailSheet> {
     return '未知';
   }
 
-  Widget _buildOverviewMetric(
-    BuildContext context, {
-    required IconData icon,
-    required String label,
-    required String value,
-    Color? accentColor,
-  }) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final iconColor = accentColor ?? colorScheme.primary;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(
-        color: colorScheme.surface,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: colorScheme.outlineVariant.withValues(alpha: 0.14),
-        ),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icon, size: 15, color: iconColor),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                    color: colorScheme.onSurfaceVariant,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  value,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                    color: colorScheme.onSurface,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildGeneralContent(ScrollController scrollController) {
     // 优先使用 properties，如果没有则使用列表数据
     final props = _properties;
@@ -483,22 +452,15 @@ class _QbTorrentDetailSheetState extends State<QbTorrentDetailSheet> {
 
     return SingleChildScrollView(
       controller: scrollController,
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 36),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _buildGeneralOverviewCard(context),
-          const SizedBox(height: 16),
+          const SizedBox(height: 18),
           _buildSection(
-            title: '详情',
+            title: '更多信息',
             children: [
-              _buildInfoGroupLabel(context, '任务信息'),
-              _buildInfoRow(
-                '名称',
-                props?.name ?? torrent?.name ?? widget.name,
-                icon: Icons.label,
-                maxLines: 5,
-              ),
               _buildInfoRow(
                 '哈希值',
                 props?.hash ?? widget.hash,
@@ -542,20 +504,10 @@ class _QbTorrentDetailSheetState extends State<QbTorrentDetailSheet> {
               if (props != null && props.comment.isNotEmpty)
                 _buildCommentRow(props.comment),
               _buildMagnetRow(),
-              _buildInfoGroupLabel(context, '传输状态'),
+              _buildInfoGroupLabel(context, '统计'),
               _buildMetricGrid(
                 context,
                 items: [
-                  _DetailMetricItem(
-                    label: '进度',
-                    value: _progressText(),
-                    icon: Icons.percent_rounded,
-                  ),
-                  _DetailMetricItem(
-                    label: '总大小',
-                    value: _sizeText(),
-                    icon: Icons.storage_rounded,
-                  ),
                   if (props != null)
                     _DetailMetricItem(
                       label: '已下载',
@@ -781,15 +733,17 @@ class _QbTorrentDetailSheetState extends State<QbTorrentDetailSheet> {
   }
 
   Widget _buildInfoGroupLabel(BuildContext context, String label) {
+    final scheme = Theme.of(context).colorScheme;
     return Padding(
-      padding: const EdgeInsets.only(top: 4, bottom: 10),
+      padding: const EdgeInsets.only(top: 14, bottom: 4),
       child: Text(
         label,
         style: Theme.of(context).textTheme.labelLarge?.copyWith(
-          color: Theme.of(context).colorScheme.onSurfaceVariant,
-          fontWeight: FontWeight.w700,
-          letterSpacing: 0.2,
-        ),
+              color: scheme.onSurfaceVariant,
+              fontWeight: FontWeight.w600,
+              fontSize: 12.5,
+              letterSpacing: 0.2,
+            ),
       ),
     );
   }
@@ -807,13 +761,14 @@ class _QbTorrentDetailSheetState extends State<QbTorrentDetailSheet> {
         children: [
           if (title != null) ...[
             Padding(
-              padding: const EdgeInsets.only(bottom: 8),
+              padding: const EdgeInsets.only(top: 6, bottom: 8),
               child: Text(
                 title,
                 style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  fontWeight: FontWeight.w700,
-                ),
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 12.5,
+                    ),
               ),
             ),
           ],
@@ -844,20 +799,34 @@ class _QbTorrentDetailSheetState extends State<QbTorrentDetailSheet> {
 
   Widget _buildDetailMetricCard(BuildContext context, _DetailMetricItem item) {
     final colorScheme = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 11),
       decoration: BoxDecoration(
-        color: colorScheme.surface.withValues(alpha: 0.86),
-        borderRadius: BorderRadius.circular(12),
+        color: colorScheme.secondaryContainer.withValues(
+          alpha: isDark ? 0.22 : 0.42,
+        ),
+        borderRadius: BorderRadius.circular(14),
         border: Border.all(
-          color: colorScheme.outlineVariant.withValues(alpha: 0.14),
+          color: colorScheme.outlineVariant.withValues(alpha: 0.34),
         ),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(item.icon, size: 15, color: colorScheme.onSurfaceVariant),
-          const SizedBox(width: 8),
+          Container(
+            padding: const EdgeInsets.all(7),
+            decoration: BoxDecoration(
+              color: colorScheme.primary.withValues(alpha: 0.14),
+              borderRadius: BorderRadius.circular(11),
+            ),
+            child: Icon(
+              item.icon,
+              size: 16,
+              color: colorScheme.primary,
+            ),
+          ),
+          const SizedBox(width: 10),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -894,14 +863,26 @@ class _QbTorrentDetailSheetState extends State<QbTorrentDetailSheet> {
 
   Widget _buildGeneralOverviewCard(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+      padding: const EdgeInsets.fromLTRB(18, 18, 18, 18),
       decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.16),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(20),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            colorScheme.surfaceContainerHighest.withValues(
+              alpha: isDark ? 0.52 : 0.72,
+            ),
+            colorScheme.surfaceContainerHigh.withValues(
+              alpha: isDark ? 0.28 : 0.45,
+            ),
+          ],
+        ),
         border: Border.all(
-          color: colorScheme.outlineVariant.withValues(alpha: 0.14),
+          color: colorScheme.outlineVariant.withValues(alpha: 0.22),
         ),
       ),
       child: Column(
@@ -914,76 +895,64 @@ class _QbTorrentDetailSheetState extends State<QbTorrentDetailSheet> {
                   widget.name,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
                     color: colorScheme.onSurface,
                     fontWeight: FontWeight.w700,
-                    height: 1.2,
+                    height: 1.25,
                   ),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            crossAxisAlignment: WrapCrossAlignment.center,
+          const SizedBox(height: 10),
+          Row(
             children: [
               Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 5,
-                ),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
-                  color: colorScheme.primaryContainer.withValues(alpha: 0.65),
-                  borderRadius: BorderRadius.circular(999),
+                  color: colorScheme.primary.withValues(alpha: 0.16),
+                  borderRadius: BorderRadius.circular(8),
                 ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      Icons.satellite_alt_outlined,
-                      size: 14,
-                      color: colorScheme.primary,
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      _statusText(),
-                      style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                        color: colorScheme.onPrimaryContainer,
+                child: Text(
+                  _statusText(),
+                  style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                        color: colorScheme.primary,
                         fontWeight: FontWeight.w700,
                       ),
-                    ),
-                  ],
                 ),
               ),
-              Text(
-                '添加于 ${_addedTimeText()}',
-                style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                  color: colorScheme.onSurfaceVariant,
-                  fontWeight: FontWeight.w500,
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  '添加于 ${_addedTimeText()}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                        fontWeight: FontWeight.w500,
+                      ),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 14),
           Row(
             children: [
               Expanded(
                 child: Text(
                   '当前进度',
                   style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                    color: colorScheme.onSurfaceVariant,
-                    fontWeight: FontWeight.w500,
-                  ),
+                        color: colorScheme.onSurfaceVariant,
+                        fontWeight: FontWeight.w500,
+                      ),
                 ),
               ),
               Text(
                 _progressText(),
                 style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                  color: colorScheme.onSurface,
-                  fontWeight: FontWeight.w700,
-                ),
+                      color: colorScheme.onSurface,
+                      fontWeight: FontWeight.w700,
+                    ),
               ),
             ],
           ),
@@ -992,55 +961,76 @@ class _QbTorrentDetailSheetState extends State<QbTorrentDetailSheet> {
             borderRadius: BorderRadius.circular(999),
             child: LinearProgressIndicator(
               value: _progressValue(),
-              minHeight: 8,
-              backgroundColor: colorScheme.surface.withValues(alpha: 0.55),
+              minHeight: 9,
+              backgroundColor:
+                  colorScheme.surfaceContainerHighest.withValues(alpha: 0.95),
               valueColor: AlwaysStoppedAnimation<Color>(colorScheme.primary),
             ),
           ),
-          const SizedBox(height: 12),
-          LayoutBuilder(
-            builder: (context, constraints) {
-              const spacing = 10.0;
-              final columns = constraints.maxWidth >= 560 ? 4 : 2;
-              final itemWidth =
-                  (constraints.maxWidth - spacing * (columns - 1)) / columns;
-              final items = [
-                _buildOverviewMetric(
-                  context,
-                  icon: Icons.storage_rounded,
-                  label: '总大小',
-                  value: _sizeText(),
-                ),
-                _buildOverviewMetric(
-                  context,
-                  icon: Icons.download_rounded,
-                  label: '下载速度',
-                  value: _downloadSpeedText(),
-                ),
-                _buildOverviewMetric(
-                  context,
-                  icon: Icons.upload_rounded,
-                  label: '上传速度',
-                  value: _uploadSpeedText(),
-                  accentColor: colorScheme.tertiary,
-                ),
-                _buildOverviewMetric(
-                  context,
-                  icon: Icons.swap_horiz_rounded,
-                  label: '分享率',
-                  value: _ratioText(),
-                  accentColor: colorScheme.secondary,
-                ),
-              ];
-              return Wrap(
-                spacing: spacing,
-                runSpacing: spacing,
-                children: items
-                    .map((item) => SizedBox(width: itemWidth, child: item))
-                    .toList(),
-              );
-            },
-          ),
+          const SizedBox(height: 14),
+          _buildOverviewStatsStrip(context),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildOverviewStatsStrip(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final labels = ['总大小', '下载', '上传', '比率'];
+    final values = [
+      _sizeText(),
+      _downloadSpeedText(),
+      _uploadSpeedText(),
+      _ratioText(),
+    ];
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 2),
+      decoration: BoxDecoration(
+        color: scheme.surface.withValues(alpha: isDark ? 0.28 : 0.42),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: scheme.outlineVariant.withValues(alpha: 0.28),
+        ),
+      ),
+      child: Row(
+        children: [
+          for (var i = 0; i < labels.length; i++) ...[
+            if (i > 0)
+              Container(
+                width: 1,
+                height: 36,
+                margin: const EdgeInsets.symmetric(horizontal: 4),
+                color: scheme.outlineVariant.withValues(alpha: 0.35),
+              ),
+            Expanded(
+              child: Column(
+                children: [
+                  Text(
+                    labels[i],
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                          color: scheme.onSurfaceVariant,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 11,
+                        ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    values[i],
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 13,
+                        ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -1083,15 +1073,18 @@ class _QbTorrentDetailSheetState extends State<QbTorrentDetailSheet> {
       padding: const EdgeInsets.only(bottom: 12),
       child: SizedBox(
         width: double.infinity,
-        child: OutlinedButton.icon(
+        child: FilledButton.tonalIcon(
           onPressed: () {
             Clipboard.setData(ClipboardData(text: magnetUri));
             showToast(message: '已复制 Magnet 链接');
           },
-          icon: const Icon(Icons.copy, size: 16),
+          icon: const Icon(Icons.copy_rounded, size: 18),
           label: const Text('复制 Magnet 链接'),
-          style: OutlinedButton.styleFrom(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          style: FilledButton.styleFrom(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14),
+            ),
           ),
         ),
       ),
@@ -1157,7 +1150,7 @@ class _QbTorrentDetailSheetState extends State<QbTorrentDetailSheet> {
   Widget _buildTrackerContent(ScrollController scrollController) {
     return SingleChildScrollView(
       controller: scrollController,
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 36),
       child: _buildTrackersSection(),
     );
   }
@@ -1165,7 +1158,7 @@ class _QbTorrentDetailSheetState extends State<QbTorrentDetailSheet> {
   Widget _buildContentContent(ScrollController scrollController) {
     return SingleChildScrollView(
       controller: scrollController,
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 36),
       child: _buildFilesSection(),
     );
   }
@@ -1175,21 +1168,49 @@ class _QbTorrentDetailSheetState extends State<QbTorrentDetailSheet> {
       title: 'Tracker 列表',
       children: [
         if (_isLoadingTrackers)
-          const Center(
+          Center(
             child: Padding(
-              padding: EdgeInsets.all(16.0),
-              child: CircularProgressIndicator(),
+              padding: const EdgeInsets.symmetric(vertical: 24),
+              child: Column(
+                children: [
+                  CircularProgressIndicator(
+                    color: Theme.of(context).colorScheme.primary,
+                    strokeWidth: 2.5,
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    '加载 Tracker…',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
             ),
           )
         else if (_trackers.isEmpty)
           Center(
             child: Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Text(
-                '暂无 Tracker',
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
+              padding: const EdgeInsets.symmetric(vertical: 28),
+              child: Column(
+                children: [
+                  Icon(
+                    Icons.radar_rounded,
+                    size: 40,
+                    color: Theme.of(context)
+                        .colorScheme
+                        .onSurfaceVariant
+                        .withValues(alpha: 0.45),
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    '暂无 Tracker',
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
               ),
             ),
           )
@@ -1218,14 +1239,14 @@ class _QbTorrentDetailSheetState extends State<QbTorrentDetailSheet> {
     final statusColor = tracker.statusColor;
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(12),
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: Theme.of(
           context,
-        ).colorScheme.surfaceContainerHighest.withValues(alpha: 0.2),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: statusColor.withValues(alpha: 0.3), width: 1),
+        ).colorScheme.surfaceContainerHighest.withValues(alpha: 0.38),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: statusColor.withValues(alpha: 0.32), width: 1),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1389,21 +1410,49 @@ class _QbTorrentDetailSheetState extends State<QbTorrentDetailSheet> {
       title: '文件列表',
       children: [
         if (_isLoadingFiles)
-          const Center(
+          Center(
             child: Padding(
-              padding: EdgeInsets.all(16.0),
-              child: CircularProgressIndicator(),
+              padding: const EdgeInsets.symmetric(vertical: 24),
+              child: Column(
+                children: [
+                  CircularProgressIndicator(
+                    color: Theme.of(context).colorScheme.primary,
+                    strokeWidth: 2.5,
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    '加载文件列表…',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
             ),
           )
         else if (_files.isEmpty)
           Center(
             child: Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Text(
-                '暂无文件',
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
+              padding: const EdgeInsets.symmetric(vertical: 28),
+              child: Column(
+                children: [
+                  Icon(
+                    Icons.folder_open_rounded,
+                    size: 40,
+                    color: Theme.of(context)
+                        .colorScheme
+                        .onSurfaceVariant
+                        .withValues(alpha: 0.45),
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    '暂无文件',
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
               ),
             ),
           )
@@ -1415,16 +1464,18 @@ class _QbTorrentDetailSheetState extends State<QbTorrentDetailSheet> {
 
   Widget _buildFileItem(QBTorrentFileModel file) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(12),
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: Theme.of(
           context,
-        ).colorScheme.surfaceContainerHighest.withValues(alpha: 0.2),
-        borderRadius: BorderRadius.circular(8),
+        ).colorScheme.surfaceContainerHighest.withValues(alpha: 0.38),
+        borderRadius: BorderRadius.circular(14),
         border: Border.all(
-          color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.2),
-          width: 1,
+          color: Theme.of(context)
+              .colorScheme
+              .outlineVariant
+              .withValues(alpha: 0.34),
         ),
       ),
       child: Column(
@@ -1730,44 +1781,53 @@ class _QbTorrentDetailSheetState extends State<QbTorrentDetailSheet> {
     required String title,
     required List<Widget> children,
   }) {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
-      decoration: BoxDecoration(
-        color: Theme.of(
-          context,
-        ).colorScheme.surfaceContainerHighest.withValues(alpha: 0.14),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.1),
-          width: 1,
+    final scheme = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Material(
+      color: scheme.surfaceContainerHighest.withValues(
+        alpha: isDark ? 0.4 : 0.72,
+      ),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(
+          color: scheme.outlineVariant.withValues(
+            alpha: isDark ? 0.35 : 0.48,
+          ),
+          width: 0.75,
         ),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 4,
-                height: 16,
-                margin: const EdgeInsets.only(right: 8),
-                decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.primary,
-                  borderRadius: BorderRadius.circular(999),
+      clipBehavior: Clip.antiAlias,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 3,
+                  height: 16,
+                  decoration: BoxDecoration(
+                    color: scheme.primary,
+                    borderRadius: BorderRadius.circular(3),
+                  ),
                 ),
-              ),
-              Text(
-                title,
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w700,
-                  color: Theme.of(context).colorScheme.onSurface,
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    title,
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: -0.3,
+                        ),
+                  ),
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          ...children,
-        ],
+              ],
+            ),
+            const SizedBox(height: 14),
+            ...children,
+          ],
+        ),
       ),
     );
   }
@@ -1778,61 +1838,60 @@ class _QbTorrentDetailSheetState extends State<QbTorrentDetailSheet> {
     IconData? icon,
     int maxLines = 1,
   }) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
-        decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.82),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: Theme.of(
-              context,
-            ).colorScheme.outlineVariant.withValues(alpha: 0.14),
-          ),
-        ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (icon != null) ...[
-              Icon(
-                icon,
-                size: 16,
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
-              const SizedBox(width: 8),
-            ],
-            SizedBox(
-              width: 88,
-              child: Padding(
-                padding: const EdgeInsets.only(top: 1),
-                child: Text(
-                  label,
-                  style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    fontWeight: FontWeight.w500,
+    final scheme = Theme.of(context).colorScheme;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 11),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (icon != null) ...[
+                Padding(
+                  padding: const EdgeInsets.only(top: 1),
+                  child: Icon(
+                    icon,
+                    size: 18,
+                    color: scheme.onSurfaceVariant.withValues(alpha: 0.88),
                   ),
                 ),
-              ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                value,
-                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                  color: Theme.of(context).colorScheme.onSurface,
-                  fontWeight: FontWeight.w600,
-                  height: 1.25,
+                const SizedBox(width: 10),
+              ],
+              SizedBox(
+                width: 92,
+                child: Text(
+                  label,
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: scheme.onSurfaceVariant,
+                        fontWeight: FontWeight.w500,
+                      ),
                 ),
-                maxLines: maxLines,
-                overflow: maxLines > 1
-                    ? TextOverflow.ellipsis
-                    : TextOverflow.clip,
               ),
-            ),
-          ],
+              Expanded(
+                child: Text(
+                  value,
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: scheme.onSurface,
+                        fontWeight: FontWeight.w600,
+                        height: 1.25,
+                      ),
+                  maxLines: maxLines,
+                  overflow: maxLines > 1
+                      ? TextOverflow.ellipsis
+                      : TextOverflow.clip,
+                ),
+              ),
+            ],
+          ),
         ),
-      ),
+        Divider(
+          height: 1,
+          thickness: 0.5,
+          color: scheme.outlineVariant.withValues(alpha: 0.22),
+        ),
+      ],
     );
   }
 }

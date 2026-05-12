@@ -23,7 +23,6 @@ class _QBPreferencesSettingsScreenState
     extends State<QBPreferencesSettingsScreen> {
   QBPreferencesModel? _preferences;
   bool _isLoading = false;
-  bool _hasChanges = false;
 
   DownloaderControllerProtocol get controller => widget.controller;
   // 可编辑字段的控制器
@@ -36,6 +35,12 @@ class _QBPreferencesSettingsScreenState
   final _maxActiveDownloadsController = TextEditingController();
   final _maxActiveUploadsController = TextEditingController();
   final _maxActiveTorrentsController = TextEditingController();
+  final _altDlLimitController = TextEditingController();
+  final _altUpLimitController = TextEditingController();
+  final _webUiPortController = TextEditingController();
+  final _webUiSessionTimeoutController = TextEditingController();
+  final _webUiApiKeyController = TextEditingController();
+  final _hostnameCacheTtlController = TextEditingController();
 
   // 开关状态
   bool _incompleteFilesExt = false;
@@ -45,6 +50,11 @@ class _QBPreferencesSettingsScreenState
   bool _webUiCsrfProtectionEnabled = false;
   bool _webUiSecureCookieEnabled = false;
   bool _webUiHostHeaderValidationEnabled = false;
+  bool _dht = true;
+  bool _pex = true;
+  bool _lsd = true;
+  bool _anonymousMode = false;
+  bool _resolvePeerHostNames = false;
 
   @override
   void initState() {
@@ -63,6 +73,12 @@ class _QBPreferencesSettingsScreenState
     _maxActiveDownloadsController.dispose();
     _maxActiveUploadsController.dispose();
     _maxActiveTorrentsController.dispose();
+    _altDlLimitController.dispose();
+    _altUpLimitController.dispose();
+    _webUiPortController.dispose();
+    _webUiSessionTimeoutController.dispose();
+    _webUiApiKeyController.dispose();
+    _hostnameCacheTtlController.dispose();
     super.dispose();
   }
 
@@ -111,6 +127,25 @@ class _QBPreferencesSettingsScreenState
     _maxActiveTorrentsController.text = _preferences!.maxActiveTorrents
         .toString();
 
+    _altDlLimitController.text = _preferences!.altDlLimit > 0
+        ? (_preferences!.altDlLimit ~/ 1024).toString()
+        : '0';
+    _altUpLimitController.text = _preferences!.altUpLimit > 0
+        ? (_preferences!.altUpLimit ~/ 1024).toString()
+        : '0';
+    _webUiPortController.text = _preferences!.webUiPort.toString();
+    _webUiSessionTimeoutController.text = _preferences!.webUiSessionTimeout
+        .toString();
+    _webUiApiKeyController.clear();
+    _hostnameCacheTtlController.text = _preferences!.hostnameCacheTtl
+        .toString();
+
+    _dht = _preferences!.dht;
+    _pex = _preferences!.pex;
+    _lsd = _preferences!.lsd;
+    _anonymousMode = _preferences!.anonymousMode;
+    _resolvePeerHostNames = _preferences!.resolvePeerHostNames;
+
     _queueingEnabled = _preferences!.queueingEnabled;
     _tempPathEnabled = _preferences!.tempPathEnabled;
     _webUiClickjackingProtectionEnabled =
@@ -119,8 +154,6 @@ class _QBPreferencesSettingsScreenState
     _webUiSecureCookieEnabled = _preferences!.webUiSecureCookieEnabled;
     _webUiHostHeaderValidationEnabled =
         _preferences!.webUiHostHeaderValidationEnabled;
-
-    _hasChanges = false;
   }
 
   Future<void> _save() async {
@@ -177,6 +210,65 @@ class _QBPreferencesSettingsScreenState
         if (dlLimitBytes != _preferences!.dlLimit) {
           updateData['dl_limit'] = dlLimitBytes;
         }
+      }
+
+      final altUpLimit = int.tryParse(_altUpLimitController.text);
+      if (altUpLimit != null && altUpLimit >= 0) {
+        final bytes = altUpLimit * 1024;
+        if (bytes != _preferences!.altUpLimit) {
+          updateData['alt_up_limit'] = bytes;
+        }
+      }
+      final altDlLimit = int.tryParse(_altDlLimitController.text);
+      if (altDlLimit != null && altDlLimit >= 0) {
+        final bytes = altDlLimit * 1024;
+        if (bytes != _preferences!.altDlLimit) {
+          updateData['alt_dl_limit'] = bytes;
+        }
+      }
+
+      final webUiPort = int.tryParse(_webUiPortController.text);
+      if (webUiPort != null &&
+          webUiPort != _preferences!.webUiPort &&
+          webUiPort >= 1 &&
+          webUiPort <= 65535) {
+        updateData['web_ui_port'] = webUiPort;
+      }
+
+      final webUiSessionTimeout = int.tryParse(
+        _webUiSessionTimeoutController.text,
+      );
+      if (webUiSessionTimeout != null &&
+          webUiSessionTimeout >= 0 &&
+          webUiSessionTimeout != _preferences!.webUiSessionTimeout) {
+        updateData['web_ui_session_timeout'] = webUiSessionTimeout;
+      }
+
+      if (_webUiApiKeyController.text.isNotEmpty) {
+        updateData['web_ui_api_key'] = _webUiApiKeyController.text;
+      }
+
+      final hostnameTtl = int.tryParse(_hostnameCacheTtlController.text);
+      if (hostnameTtl != null &&
+          hostnameTtl > 0 &&
+          hostnameTtl != _preferences!.hostnameCacheTtl) {
+        updateData['hostname_cache_ttl'] = hostnameTtl;
+      }
+
+      if (_dht != _preferences!.dht) {
+        updateData['dht'] = _dht;
+      }
+      if (_pex != _preferences!.pex) {
+        updateData['pex'] = _pex;
+      }
+      if (_lsd != _preferences!.lsd) {
+        updateData['lsd'] = _lsd;
+      }
+      if (_anonymousMode != _preferences!.anonymousMode) {
+        updateData['anonymous_mode'] = _anonymousMode;
+      }
+      if (_resolvePeerHostNames != _preferences!.resolvePeerHostNames) {
+        updateData['resolve_peer_host_names'] = _resolvePeerHostNames;
       }
 
       // 6. 最大活跃检查 Torrent 数
@@ -253,7 +345,6 @@ class _QBPreferencesSettingsScreenState
       final success = await controller.updatePreferences(updateData);
       if (success) {
         successToast(message: '保存成功');
-        _hasChanges = false;
         await _loadPreferences();
       }
     } catch (e) {
@@ -261,14 +352,6 @@ class _QBPreferencesSettingsScreenState
     } finally {
       setState(() {
         _isLoading = false;
-      });
-    }
-  }
-
-  void _markAsChanged() {
-    if (!_hasChanges) {
-      setState(() {
-        _hasChanges = true;
       });
     }
   }
@@ -291,7 +374,6 @@ class _QBPreferencesSettingsScreenState
             onChanged: (value) {
               setState(() {
                 _incompleteFilesExt = value;
-                _markAsChanged();
               });
             },
           ),
@@ -299,25 +381,18 @@ class _QBPreferencesSettingsScreenState
             title: '默认保存路径',
             tip: '下载文件的默认保存路径',
             controller: _savePathController,
-            onChanged: (value) {
-              _markAsChanged();
-            },
           ),
           LabelTextFieldForm(
             title: '保存未完成的 torrent 到',
             tip: '未完成文件的临时保存路径',
             controller: _tempPathController,
             enabled: _tempPathEnabled,
-            onChanged: (value) {
-              _markAsChanged();
-            },
             headerTrailing: CupertinoSwitch(
               activeColor: Get.theme.colorScheme.primary,
               value: _tempPathEnabled,
               onChanged: (value) {
                 setState(() {
                   _tempPathEnabled = value;
-                  _markAsChanged();
                 });
               },
             ),
@@ -341,18 +416,21 @@ class _QBPreferencesSettingsScreenState
             controller: _listenPortController,
             keyboardType: TextInputType.number,
             inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-            onChanged: (value) {
-              _markAsChanged();
-            },
             suffixIcon: TextButton(
               child: const Text('随机'),
               onPressed: () {
                 final random = Random();
                 final randomPort = 1000 + random.nextInt(65535 - 1000 + 1);
                 _listenPortController.text = randomPort.toString();
-                _markAsChanged();
               },
             ),
+          ),
+          LabelTextFieldForm(
+            title: '主机名缓存 TTL（秒）',
+            tip: 'DNS 缓存 TTL',
+            controller: _hostnameCacheTtlController,
+            keyboardType: TextInputType.number,
+            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
           ),
         ],
       ),
@@ -373,9 +451,6 @@ class _QBPreferencesSettingsScreenState
             controller: _upLimitController,
             keyboardType: TextInputType.number,
             inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-            onChanged: (value) {
-              _markAsChanged();
-            },
           ),
           LabelTextFieldForm(
             title: '下载速度限制 (KB/s)',
@@ -383,9 +458,115 @@ class _QBPreferencesSettingsScreenState
             controller: _dlLimitController,
             keyboardType: TextInputType.number,
             inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+          ),
+          LabelTextFieldForm(
+            title: '备用上传限速 (KB/s)',
+            tip: '计划限速等场景；0 为无限制',
+            controller: _altUpLimitController,
+            keyboardType: TextInputType.number,
+            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+          ),
+          LabelTextFieldForm(
+            title: '备用下载限速 (KB/s)',
+            tip: '0 为无限制',
+            controller: _altDlLimitController,
+            keyboardType: TextInputType.number,
+            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBitTorrentSection() {
+    return SliverToBoxAdapter(
+      child: CupertinoListSection.insetGrouped(
+        header: Padding(
+          padding: const EdgeInsets.only(left: 16, bottom: 4, top: 2),
+          child: Text(
+            'BitTorrent',
+            style: Theme.of(context).textTheme.titleMedium,
+          ),
+        ),
+        children: [
+          LabelSwitchForm(
+            title: 'DHT',
+            value: _dht,
             onChanged: (value) {
-              _markAsChanged();
+              setState(() {
+                _dht = value;
+              });
             },
+          ),
+          LabelSwitchForm(
+            title: 'PEX',
+            value: _pex,
+            onChanged: (value) {
+              setState(() {
+                _pex = value;
+              });
+            },
+          ),
+          LabelSwitchForm(
+            title: '本地对等端发现 (LSD)',
+            value: _lsd,
+            onChanged: (value) {
+              setState(() {
+                _lsd = value;
+              });
+            },
+          ),
+          LabelSwitchForm(
+            title: '匿名模式',
+            value: _anonymousMode,
+            onChanged: (value) {
+              setState(() {
+                _anonymousMode = value;
+              });
+            },
+          ),
+          LabelSwitchForm(
+            title: '解析对等端主机名',
+            value: _resolvePeerHostNames,
+            onChanged: (value) {
+              setState(() {
+                _resolvePeerHostNames = value;
+              });
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildWebUiSection() {
+    return SliverToBoxAdapter(
+      child: CupertinoListSection.insetGrouped(
+        header: Padding(
+          padding: const EdgeInsets.only(left: 16, bottom: 4, top: 2),
+          child: Text('Web 界面', style: Theme.of(context).textTheme.titleMedium),
+        ),
+        children: [
+          LabelTextFieldForm(
+            title: 'Web UI 端口',
+            controller: _webUiPortController,
+            keyboardType: TextInputType.number,
+            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+          ),
+          LabelTextFieldForm(
+            title: '会话超时 (秒)',
+            tip: 'Cookie 过期时间',
+            controller: _webUiSessionTimeoutController,
+            keyboardType: TextInputType.number,
+            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+          ),
+          LabelTextFieldForm(
+            title: 'Web API 密钥',
+            tip: _preferences!.webUiApiKey.isEmpty
+                ? '可选'
+                : '已配置密钥；填入新值将覆盖',
+            controller: _webUiApiKeyController,
+            obscureText: true,
           ),
         ],
       ),
@@ -409,7 +590,6 @@ class _QBPreferencesSettingsScreenState
             onChanged: (value) {
               setState(() {
                 _queueingEnabled = value;
-                _markAsChanged();
               });
             },
           ),
@@ -418,36 +598,24 @@ class _QBPreferencesSettingsScreenState
             controller: _maxActiveCheckingTorrentsController,
             keyboardType: TextInputType.number,
             inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-            onChanged: (value) {
-              _markAsChanged();
-            },
           ),
           LabelTextFieldForm(
             title: '最大活动的下载数',
             controller: _maxActiveDownloadsController,
             keyboardType: TextInputType.number,
             inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-            onChanged: (value) {
-              _markAsChanged();
-            },
           ),
           LabelTextFieldForm(
             title: '最大活动的上传数',
             controller: _maxActiveUploadsController,
             keyboardType: TextInputType.number,
             inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-            onChanged: (value) {
-              _markAsChanged();
-            },
           ),
           LabelTextFieldForm(
             title: '最大活动的 torrent 数',
             controller: _maxActiveTorrentsController,
             keyboardType: TextInputType.number,
             inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-            onChanged: (value) {
-              _markAsChanged();
-            },
           ),
         ],
       ),
@@ -469,7 +637,6 @@ class _QBPreferencesSettingsScreenState
             onChanged: (value) {
               setState(() {
                 _webUiClickjackingProtectionEnabled = value;
-                _markAsChanged();
               });
             },
           ),
@@ -479,7 +646,6 @@ class _QBPreferencesSettingsScreenState
             onChanged: (value) {
               setState(() {
                 _webUiCsrfProtectionEnabled = value;
-                _markAsChanged();
               });
             },
           ),
@@ -489,7 +655,6 @@ class _QBPreferencesSettingsScreenState
             onChanged: (value) {
               setState(() {
                 _webUiSecureCookieEnabled = value;
-                _markAsChanged();
               });
             },
           ),
@@ -499,7 +664,6 @@ class _QBPreferencesSettingsScreenState
             onChanged: (value) {
               setState(() {
                 _webUiHostHeaderValidationEnabled = value;
-                _markAsChanged();
               });
             },
           ),
@@ -585,6 +749,14 @@ class _QBPreferencesSettingsScreenState
         children: [
           _buildReadOnlyItem('最大连接数', _preferences!.maxConnec.toString()),
           _buildReadOnlyItem(
+            '解析对等端国家/地区',
+            _preferences!.resolvePeerCountries ? '是' : '否',
+          ),
+          _buildReadOnlyItem(
+            '主机名缓存 TTL',
+            '${_preferences!.hostnameCacheTtl} 秒',
+          ),
+          _buildReadOnlyItem(
             '每个 Torrent 最大连接数',
             _preferences!.maxConnecPerTorrent.toString(),
           ),
@@ -653,18 +825,6 @@ class _QBPreferencesSettingsScreenState
                 : '${(_preferences!.upLimit / 1024).toStringAsFixed(0)} KB/s',
           ),
           _buildReadOnlyItem(
-            '替代下载速度限制',
-            _preferences!.altDlLimit == 0
-                ? '无限制'
-                : '${(_preferences!.altDlLimit / 1024).toStringAsFixed(0)} KB/s',
-          ),
-          _buildReadOnlyItem(
-            '替代上传速度限制',
-            _preferences!.altUpLimit == 0
-                ? '无限制'
-                : '${(_preferences!.altUpLimit / 1024).toStringAsFixed(0)} KB/s',
-          ),
-          _buildReadOnlyItem(
             '限制 UTP 速率',
             _preferences!.limitUtpRate ? '是' : '否',
           ),
@@ -708,10 +868,11 @@ class _QBPreferencesSettingsScreenState
           ),
         ),
         children: [
-          _buildReadOnlyItem('DHT', _preferences!.dht ? '启用' : '禁用'),
           _buildReadOnlyItem('DHT 引导节点', _preferences!.dhtBootstrapNodes),
-          _buildReadOnlyItem('PEX', _preferences!.pex ? '启用' : '禁用'),
-          _buildReadOnlyItem('LSD', _preferences!.lsd ? '启用' : '禁用'),
+          _buildReadOnlyItem(
+            '解析对等端主机名',
+            _preferences!.resolvePeerHostNames ? '是' : '否',
+          ),
           _buildReadOnlyItem(
             '加密',
             _preferences!.encryption == 0
@@ -720,7 +881,6 @@ class _QBPreferencesSettingsScreenState
                 ? '首选'
                 : '强制',
           ),
-          _buildReadOnlyItem('匿名模式', _preferences!.anonymousMode ? '是' : '否'),
           _buildReadOnlyItem(
             'BitTorrent 协议',
             _preferences!.bittorrentProtocol == 0
@@ -832,8 +992,15 @@ class _QBPreferencesSettingsScreenState
         ),
         children: [
           _buildReadOnlyItem('Web UI 地址', _preferences!.webUiAddress),
-          _buildReadOnlyItem('Web UI 端口', _preferences!.webUiPort.toString()),
+          _buildReadOnlyItem(
+            'Web API 密钥',
+            _preferences!.webUiApiKey.isEmpty ? '未配置' : '***',
+          ),
           _buildReadOnlyItem('Web UI 用户名', _preferences!.webUiUsername),
+          _buildReadOnlyItem(
+            'Web UI 会话超时',
+            '${_preferences!.webUiSessionTimeout} 秒',
+          ),
           _buildReadOnlyItem('使用 HTTPS', _preferences!.useHttps ? '是' : '否'),
           _buildReadOnlyItem(
             'Web UI HTTPS 证书路径',
@@ -873,10 +1040,6 @@ class _QBPreferencesSettingsScreenState
           _buildReadOnlyItem(
             'Web UI 封禁时长',
             '${_preferences!.webUiBanDuration} 秒',
-          ),
-          _buildReadOnlyItem(
-            'Web UI 会话超时',
-            '${_preferences!.webUiSessionTimeout} 秒',
           ),
           _buildReadOnlyItem(
             '替代 Web UI 启用',
@@ -925,12 +1088,11 @@ class _QBPreferencesSettingsScreenState
       appBar: AppBar(
         title: const Text('qBittorrent 设置'),
         actions: [
-          if (_hasChanges)
-            IconButton(
-              onPressed: _save,
-              icon: const Icon(Icons.save),
-              tooltip: '保存',
-            ),
+          IconButton(
+            onPressed: _preferences != null && !_isLoading ? _save : null,
+            icon: const Icon(Icons.save),
+            tooltip: '保存',
+          ),
         ],
       ),
       body: KeyboardDismissOnTap(
@@ -956,9 +1118,11 @@ class _QBPreferencesSettingsScreenState
                 slivers: [
                   _buildFileSaveSection(),
                   _buildConnectionSection(),
+                  _buildBitTorrentSection(),
                   _buildSpeedLimitSection(),
                   _buildTorrentManagementSection(),
                   _buildSecuritySection(),
+                  _buildWebUiSection(),
                   _buildDownloadReadOnlySection(),
                   _buildConnectionReadOnlySection(),
                   _buildSpeedLimitReadOnlySection(),

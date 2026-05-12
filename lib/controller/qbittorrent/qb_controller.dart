@@ -1889,6 +1889,7 @@ class QBController extends GetxController
         cookie: cookie,
         rename: rename,
         category: category,
+        tags: tags,
         paused: paused,
         stopCondition: stopCondition,
         skipChecking: skipChecking,

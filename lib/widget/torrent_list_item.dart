@@ -1,9 +1,7 @@
-import 'package:adaptive_platform_ui/adaptive_platform_ui.dart';
 import 'package:altman_downloader_control/controller/protocol.dart';
 import 'package:altman_downloader_control/controller/qbittorrent/qb_controller.dart';
 import 'package:altman_downloader_control/model/torrent_item_model.dart';
 import 'package:altman_downloader_control/page/torrent_detail_sheet.dart';
-import 'package:altman_downloader_control/theme/downloader_adaptive_config.dart';
 import 'package:altman_downloader_control/utils/toast_utils.dart';
 import 'package:altman_downloader_control/utils/torrent_state_localizable.dart';
 import 'package:altman_downloader_control/widget/input_dialog.dart'
@@ -11,10 +9,13 @@ import 'package:altman_downloader_control/widget/input_dialog.dart'
 import 'package:altman_downloader_control/widget/qbittorrent/qb_category_picker.dart';
 import 'package:altman_downloader_control/widget/qbittorrent/qb_tag_picker.dart';
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:collection/collection.dart';
 
 import '../utils/string_utils.dart';
+
+bool _isIosPlatform() => defaultTargetPlatform == TargetPlatform.iOS;
 
 class _TorrentActionMenuItem {
   final String action;
@@ -70,7 +71,7 @@ class TorrentListItem extends StatelessWidget {
         .toHumanReadableFileSize();
     final baseTint = isDark ? const Color(0xFF1C1C1E) : Colors.white;
     final fillAlpha = isDark ? 0.5 : 0.62;
-    final cardFill = PlatformInfo.isIOS && selected
+    final cardFill = _isIosPlatform() && selected
         ? Color.alphaBlend(
             colorScheme.primary.withValues(alpha: 0.22),
             baseTint.withValues(alpha: fillAlpha),
@@ -132,7 +133,7 @@ class TorrentListItem extends StatelessWidget {
         final itemWidth = constraints.hasBoundedWidth
             ? constraints.maxWidth
             : MediaQuery.sizeOf(context).width;
-        final item = SizedBox(
+        final card = SizedBox(
           width: itemWidth,
           child: GestureDetector(
             behavior: HitTestBehavior.opaque,
@@ -144,21 +145,16 @@ class TorrentListItem extends StatelessWidget {
               }
             },
             child: Padding(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 16.0,
-                vertical: 5.0,
-              ),
-              child: AdaptiveCard(
-                margin: EdgeInsets.zero,
-                borderRadius: BorderRadius.circular(16),
-                elevation: 0,
-                color: cardFill,
-                shape: PlatformInfo.isIOS
-                    ? null
-                    : RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                        side: borderSide,
-                      ),
+              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 5.0),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: cardFill,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: borderSide.color,
+                    width: borderSide.width,
+                  ),
+                ),
                 padding: const EdgeInsets.symmetric(
                   horizontal: 12.0,
                   vertical: 10.0,
@@ -250,10 +246,14 @@ class TorrentListItem extends StatelessWidget {
           ),
         );
 
-        if (selectionMode) return item;
-        return AdaptiveContextMenu(
-          actions: _buildContextMenuActions(context),
-          child: item,
+        return SizedBox(
+          width: itemWidth,
+          child: selectionMode
+              ? card
+              : CupertinoContextMenu(
+                  actions: _cupertinoContextMenuActions(context),
+                  child: card,
+                ),
         );
       },
     );
@@ -552,49 +552,23 @@ class TorrentListItem extends StatelessWidget {
     );
   }
 
-  List<AdaptiveContextMenuAction> _buildContextMenuActions(
-    BuildContext context,
-  ) {
+  List<Widget> _cupertinoContextMenuActions(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return [
       for (final item in _actionMenuItems)
-        AdaptiveContextMenuAction(
-          icon: item.icon,
-          isDestructive: item.isDestructiveAction,
-          onPressed: () {
-            _handleMenuAction(context, item.action);
-          },
-          title: item.label,
+        CupertinoContextMenuAction(
+          onPressed: () => _handleMenuAction(context, item.action),
+          isDefaultAction: item.isDefaultAction,
+          isDestructiveAction: item.isDestructiveAction,
+          trailingIcon: item.icon,
+          child: Text(
+            item.label,
+            style: TextStyle(
+              color: item.isDestructiveAction ? cs.error : null,
+            ),
+          ),
         ),
     ];
-  }
-
-  Future<void> _showIosTorrentActionSheet(BuildContext context) async {
-    final actions = _buildContextMenuActions(context);
-    await showCupertinoModalPopup<void>(
-      context: context,
-      builder: (ctx) => CupertinoActionSheet(
-        title: Text(
-          torrent.name.trim().isEmpty ? '未命名任务' : torrent.name,
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-        ),
-        actions: [
-          for (final a in actions)
-            CupertinoActionSheetAction(
-              onPressed: () {
-                Navigator.of(ctx).pop();
-                a.onPressed();
-              },
-              isDestructiveAction: a.isDestructive,
-              child: Text(a.title),
-            ),
-        ],
-        cancelButton: CupertinoActionSheetAction(
-          onPressed: () => Navigator.of(ctx).pop(),
-          child: const Text('取消'),
-        ),
-      ),
-    );
   }
 
   static const List<_TorrentActionMenuItem> _actionMenuItems = [
@@ -1100,20 +1074,17 @@ class TorrentListItem extends StatelessWidget {
                   Expanded(
                     child: Text(
                       torrent.name,
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.bold,
                       ),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
-                  AdaptiveButton.icon(
-                    useNative:
-                        DownloaderAdaptiveConfig.useNativeIos26Chrome,
+                  IconButton(
                     onPressed: () => Navigator.pop(context),
-                    icon: Icons.close,
-                    style: AdaptiveButtonStyle.plain,
-                    size: AdaptiveButtonSize.small,
+                    icon: const Icon(Icons.close),
+                    visualDensity: VisualDensity.compact,
                   ),
                 ],
               ),

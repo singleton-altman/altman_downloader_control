@@ -18,6 +18,19 @@ class QBService {
   bool _initialized = false;
   final _log = DownloaderLog();
 
+  bool _dioLooksLikeMissingEndpoint(DioException e) {
+    final c = e.response?.statusCode;
+    if (c == 404 || c == 405) return true;
+    final b = e.response?.data?.toString().toLowerCase() ?? '';
+    if (c == 400 &&
+        (b.contains('does not exist') ||
+            b.contains('endpoint does not exist') ||
+            (b.contains('missing') && b.contains('parameter')))) {
+      return true;
+    }
+    return false;
+  }
+
   /// 初始化 API 连接
   Future<bool> initialize({
     required String baseUrl,
@@ -126,38 +139,49 @@ class QBService {
     }
   }
 
-  /// 暂停/停止种子
-  /// API: POST /api/v2/torrents/stop
-  /// 根据 curl 示例，使用 stop 接口，hashes 参数可以是单个 hash 或用 | 分隔的多个 hash
+  /// 暂停/停止种子（5.x: stop，4.x: 自动回退 pause）
   Future<void> pauseTorrents(List<String> hashes) async {
     if (!_initialized) {
       throw Exception('API not initialized');
     }
 
     try {
-      // qBittorrent API 支持单个 hash 或多个 hash（用 | 分隔）
       final hashesParam = hashes.join('|');
-      await _client.post('api/v2/torrents/stop', data: {'hashes': hashesParam});
+      final data = {'hashes': hashesParam};
+      try {
+        await _client.post('api/v2/torrents/stop', data: data);
+      } on DioException catch (e) {
+        if (_dioLooksLikeMissingEndpoint(e)) {
+          _log.d('QB: torrents/stop 不可用，回退 torrents/pause（4.x）');
+          await _client.post('api/v2/torrents/pause', data: data);
+        } else {
+          rethrow;
+        }
+      }
     } catch (e) {
       rethrow;
     }
   }
 
-  /// 启动/恢复种子
-  /// API: POST /api/v2/torrents/start
-  /// 根据 curl 示例，使用 start 接口，hashes 参数可以是单个 hash 或用 | 分隔的多个 hash
+  /// 启动/恢复种子（5.x: start，4.x: 自动回退 resume）
   Future<void> resumeTorrents(List<String> hashes) async {
     if (!_initialized) {
       throw Exception('API not initialized');
     }
 
     try {
-      // qBittorrent API 支持单个 hash 或多个 hash（用 | 分隔）
       final hashesParam = hashes.join('|');
-      await _client.post(
-        'api/v2/torrents/start',
-        data: {'hashes': hashesParam},
-      );
+      final data = {'hashes': hashesParam};
+      try {
+        await _client.post('api/v2/torrents/start', data: data);
+      } on DioException catch (e) {
+        if (_dioLooksLikeMissingEndpoint(e)) {
+          _log.d('QB: torrents/start 不可用，回退 torrents/resume（4.x）');
+          await _client.post('api/v2/torrents/resume', data: data);
+        } else {
+          rethrow;
+        }
+      }
     } catch (e) {
       rethrow;
     }
@@ -638,8 +662,9 @@ class QBService {
         data: {'json': jsonString},
       );
 
-      if (response.statusCode != 200) {
-        throw Exception('Failed to update preferences: ${response.statusCode}');
+      final sc = response.statusCode ?? 0;
+      if (sc != 200 && sc != 204) {
+        throw Exception('Failed to update preferences: $sc');
       }
     } catch (e) {
       rethrow;
@@ -716,18 +741,29 @@ class QBService {
     }
   }
 
-  /// 编辑 Tracker
-  /// API: POST /api/v2/torrents/editTracker
+  /// 编辑 Tracker（新 WebAPI: url，旧版回退 origUrl）
   Future<void> editTracker(String hash, String oldUrl, String newUrl) async {
     if (!_initialized) {
       throw Exception('API not initialized');
     }
 
     try {
-      await _client.post(
-        'api/v2/torrents/editTracker',
-        data: {'hash': hash, 'oldUrl': oldUrl, 'newUrl': newUrl},
-      );
+      try {
+        await _client.post(
+          'api/v2/torrents/editTracker',
+          data: {'hash': hash, 'url': oldUrl, 'newUrl': newUrl},
+        );
+      } on DioException catch (e) {
+        if (_dioLooksLikeMissingEndpoint(e)) {
+          _log.d('QB: editTracker 使用 url 失败，回退 origUrl（旧 WebAPI）');
+          await _client.post(
+            'api/v2/torrents/editTracker',
+            data: {'hash': hash, 'origUrl': oldUrl, 'newUrl': newUrl},
+          );
+        } else {
+          rethrow;
+        }
+      }
     } catch (e) {
       rethrow;
     }
@@ -797,6 +833,8 @@ class QBService {
     String? cookie,
     String? rename,
     String? category,
+    List<String>? tags,
+    bool useDownloadPath = false,
     bool paused = false,
     String? stopCondition,
     bool? skipChecking,
@@ -860,6 +898,16 @@ class QBService {
         formData.fields.add(const MapEntry('category', ''));
       }
 
+      if (tags != null && tags.isNotEmpty) {
+        formData.fields.add(MapEntry('tags', tags.join(', ')));
+      } else {
+        formData.fields.add(const MapEntry('tags', ''));
+      }
+
+      formData.fields.add(
+        MapEntry('useDownloadPath', useDownloadPath ? 'true' : 'false'),
+      );
+
       // autoTMM: Swift 中使用 autoTMM
       formData.fields.add(MapEntry('autoTMM', autoTMM ? 'true' : 'false'));
 
@@ -905,16 +953,30 @@ class QBService {
         ),
       );
 
-      // qBittorrent API 在添加失败时也可能返回 200，需要检查响应内容
-      // 成功时通常返回空响应或 "Ok."，失败时返回错误信息
-      if (response.statusCode != 200) {
-        throw Exception('添加种子失败: HTTP ${response.statusCode}');
+      final body = _coerceTorrentsAddResponseData(response.data);
+
+      final code = response.statusCode ?? 0;
+      if (code == 409) {
+        final msg = _torrentsAddErrorBody(body);
+        throw Exception(msg ?? '添加种子失败: 全部未能添加');
+      }
+      if (code != 200 && code != 202) {
+        throw Exception('添加种子失败: HTTP $code');
       }
 
-      // 检查响应内容（如果响应体是字符串且包含错误信息）
-      if (response.data != null && response.data is String) {
-        final responseText = response.data.toString().trim();
-        // 如果响应不是空字符串也不是 "Ok."，可能是错误信息
+      if (body is Map) {
+        final m = Map<String, dynamic>.from(body);
+        final fail = (m['failure_count'] as num?)?.toInt() ?? 0;
+        final ok = (m['success_count'] as num?)?.toInt() ?? 0;
+        final pend = (m['pending_count'] as num?)?.toInt() ?? 0;
+        if (fail > 0 && ok == 0 && pend == 0) {
+          throw Exception('添加种子失败: ${jsonEncode(m)}');
+        }
+        return;
+      }
+
+      if (body != null && body is String) {
+        final responseText = body.toString().trim();
         if (responseText.isNotEmpty &&
             responseText != 'Ok.' &&
             responseText != 'Ok' &&
@@ -1001,5 +1063,36 @@ class QBService {
       _log.e('Get logs error: $e');
       rethrow;
     }
+  }
+
+  dynamic _coerceTorrentsAddResponseData(dynamic raw) {
+    if (raw is Map) return raw;
+    if (raw is String) {
+      final t = raw.trim();
+      if (t.startsWith('{')) {
+        try {
+          final o = jsonDecode(t);
+          if (o is Map) {
+            return Map<String, dynamic>.from(o as Map);
+          }
+        } catch (_) {}
+      }
+    }
+    return raw;
+  }
+
+  String? _torrentsAddErrorBody(dynamic data) {
+    if (data is Map) {
+      try {
+        return jsonEncode(data);
+      } catch (_) {
+        return data.toString();
+      }
+    }
+    if (data is String) {
+      final t = data.trim();
+      return t.isNotEmpty ? t : null;
+    }
+    return null;
   }
 }

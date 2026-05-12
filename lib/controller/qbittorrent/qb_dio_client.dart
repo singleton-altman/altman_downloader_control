@@ -1,3 +1,4 @@
+import 'package:altman_downloader_control/utils/log.dart';
 import 'package:dio/dio.dart';
 import 'package:dio_cookie_manager/dio_cookie_manager.dart';
 import 'package:cookie_jar/cookie_jar.dart';
@@ -10,6 +11,80 @@ class QBDioClient {
   String? _username;
   String? _password;
   final CookieJar _cookieJar = CookieJar();
+  final DownloaderLog _log = DownloaderLog();
+
+  String _shortBody(dynamic data) {
+    if (data == null) return '(null)';
+    final s = data.toString();
+    if (s.length > 400) return '${s.substring(0, 400)}…';
+    return s;
+  }
+
+  String _safeRequestData(RequestOptions o) {
+    final data = o.data;
+    if (data == null) return '';
+    if (data is Map && o.path.contains('auth/login')) {
+      final m = Map<String, dynamic>.from(data as Map);
+      if (m['password'] != null) m['password'] = '***';
+      return m.toString();
+    }
+    final s = data.toString();
+    if (s.length > 400) return '${s.substring(0, 400)}…';
+    return s;
+  }
+
+  String _setCookieSummary(Response r) {
+    final list = r.headers.map.entries
+        .where((e) => e.key.toLowerCase() == 'set-cookie')
+        .expand((e) => e.value)
+        .toList();
+    if (list.isEmpty) return '-';
+    return list
+        .map((c) => c.split('=').first)
+        .where((n) => n.isNotEmpty)
+        .join(', ');
+  }
+
+  void _attachLogging() {
+    _dio.interceptors.add(
+      InterceptorsWrapper(
+        onRequest: (options, handler) {
+          final extra = _safeRequestData(options);
+          final cookieNote =
+              options.headers['Cookie'] != null ? ' hasCookieHdr' : '';
+          _log.d(
+            'QB HTTP → ${options.method} ${options.uri}$cookieNote'
+            '${extra.isNotEmpty ? ' $extra' : ''}',
+          );
+          handler.next(options);
+        },
+        onResponse: (response, handler) {
+          _log.d(
+            'QB HTTP ← ${response.statusCode} ${response.requestOptions.uri} '
+            'Set-Cookie[${_setCookieSummary(response)}] '
+            'body ${_shortBody(response.data)}',
+          );
+          handler.next(response);
+        },
+        onError: (error, handler) {
+          final r = error.response;
+          if (r != null) {
+            _log.w(
+              'QB HTTP × ${r.statusCode} ${r.requestOptions.uri} '
+              'Set-Cookie[${_setCookieSummary(r)}] '
+              'body ${_shortBody(r.data)} ${error.message}',
+            );
+          } else {
+            _log.e(
+              'QB HTTP × ${error.requestOptions.uri} ${error.type} '
+              '${error.message}',
+            );
+          }
+          handler.next(error);
+        },
+      ),
+    );
+  }
 
   /// 初始化客户端
   void initialize({
@@ -38,16 +113,7 @@ class QBDioClient {
 
     // 添加 Cookie 管理器（qBittorrent 使用 Cookie 进行认证）
     _dio.interceptors.add(CookieManager(_cookieJar));
-
-    // 添加错误日志拦截器
-    _dio.interceptors.add(
-      InterceptorsWrapper(
-        onError: (error, handler) {
-          if (error.response != null) {}
-          handler.next(error);
-        },
-      ),
-    );
+    _attachLogging();
   }
 
   /// 登录到 qBittorrent
@@ -61,13 +127,42 @@ class QBDioClient {
       final response = await _dio.post(
         'api/v2/auth/login',
         data: {'username': _username, 'password': _password},
-        options: Options(validateStatus: (status) => status! < 500),
+        options: Options(
+          validateStatus: (status) => status != null && status < 500,
+        ),
       );
 
-      // qBittorrent 登录成功返回 "Ok."，失败返回 "Fails."
-      final responseText = response.data.toString().trim();
-      return responseText == 'Ok.' || responseText == 'Ok';
-    } catch (e) {
+      final code = response.statusCode ?? 0;
+      final data = response.data;
+      if (code == 401) {
+        _log.w('QB login: 401 凭据无效或需其它认证方式 data ${_shortBody(data)}');
+        return false;
+      }
+      if (code >= 400) {
+        _log.w('QB login: HTTP $code data ${_shortBody(data)}');
+        return false;
+      }
+
+      if (data == null) {
+        final ok = code == 200 || code == 204;
+        if (!ok) _log.w('QB login: 无 body 且 status=$code');
+        return ok;
+      }
+      if (data is String) {
+        final t = data.trim();
+        if (t == 'Fails.' || t == 'Fails') {
+          _log.w('QB login: 服务端返回 Fails');
+          return false;
+        }
+        if (t.isEmpty) return code == 200 || code == 204;
+        final ok = t == 'Ok.' || t == 'Ok';
+        if (!ok) _log.w('QB login: 未知响应文本 ${_shortBody(t)}');
+        return ok;
+      }
+      _log.d('QB login: 非字符串 body ${_shortBody(data)} 按 2xx 判定');
+      return code >= 200 && code < 300;
+    } catch (e, st) {
+      _log.e('QB login 异常: $e\n$st');
       return false;
     }
   }
@@ -77,20 +172,23 @@ class QBDioClient {
     try {
       final response = await _dio.get(
         'api/v2/app/version',
-        options: Options(validateStatus: (status) => status! < 500),
+        options: Options(validateStatus: (status) => status != null && status < 500),
       );
 
-      // 如果返回 403，说明需要登录
-      if (response.statusCode == 403) {
+      final code = response.statusCode ?? 0;
+      if (code == 403 || code == 401) {
+        _log.d('QB checkConnection: $code 需要会话，尝试 login');
         if (_username != null && _password != null) {
           return await login();
         }
         return false;
       }
 
-      return response.statusCode == 200;
-    } catch (e) {
-      // 如果连接失败，尝试重新登录
+      if (code == 200) return true;
+      _log.w('QB checkConnection: 未预期 status=$code body ${_shortBody(response.data)}');
+      return false;
+    } catch (e, st) {
+      _log.e('QB checkConnection 异常: $e\n$st');
       if (_username != null && _password != null) {
         return await login();
       }
@@ -119,14 +217,16 @@ class QBDioClient {
         options: options,
       );
     } catch (e) {
-      // 如果是认证错误，尝试重新登录
-      if (e is DioException && e.response?.statusCode == 403) {
-        if (await login()) {
-          return await _dio.get(
-            path,
-            queryParameters: queryParameters,
-            options: options,
-          );
+      if (e is DioException) {
+        final sc = e.response?.statusCode;
+        if (sc == 403 || sc == 401) {
+          if (await login()) {
+            return await _dio.get(
+              path,
+              queryParameters: queryParameters,
+              options: options,
+            );
+          }
         }
       }
       rethrow;
@@ -156,15 +256,17 @@ class QBDioClient {
         options: options,
       );
     } catch (e) {
-      // 如果是认证错误，尝试重新登录
-      if (e is DioException && e.response?.statusCode == 403) {
-        if (await login()) {
-          return await _dio.post(
-            path,
-            data: data,
-            queryParameters: queryParameters,
-            options: options,
-          );
+      if (e is DioException) {
+        final sc = e.response?.statusCode;
+        if (sc == 403 || sc == 401) {
+          if (await login()) {
+            return await _dio.post(
+              path,
+              data: data,
+              queryParameters: queryParameters,
+              options: options,
+            );
+          }
         }
       }
       rethrow;

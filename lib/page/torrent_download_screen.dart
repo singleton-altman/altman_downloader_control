@@ -767,9 +767,7 @@ class _TorrentDownloadScreenState extends State<TorrentDownloadScreen> {
           onPressed: _onDownload,
           child: const Text(
             '下载',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 16,
+            style: TextStyle(              fontSize: 16,
               fontWeight: FontWeight.w600,
             ),
           ),

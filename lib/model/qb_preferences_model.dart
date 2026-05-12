@@ -156,6 +156,9 @@ class QBPreferencesModel with _$QBPreferencesModel {
     String fileLogPath,
     @JsonKey(name: 'file_pool_size') @Default(100) int filePoolSize,
     @JsonKey(name: 'hashing_threads') @Default(1) int hashingThreads,
+    @JsonKey(name: 'hostname_cache_ttl')
+    @Default(1200)
+    int hostnameCacheTtl,
     @JsonKey(name: 'i2p_address') @Default('127.0.0.1') String i2pAddress,
     @JsonKey(name: 'i2p_enabled') @Default(false) bool i2pEnabled,
     @JsonKey(name: 'i2p_inbound_length') @Default(3) int i2pInboundLength,
@@ -201,6 +204,9 @@ class QBPreferencesModel with _$QBPreferencesModel {
     @JsonKey(name: 'mail_notification_ssl_enabled')
     @Default(false)
     bool mailNotificationSslEnabled,
+    @JsonKey(name: 'mail_notification_encryption_type')
+    @Default('')
+    String mailNotificationEncryptionType,
     @JsonKey(name: 'mail_notification_username')
     @Default('')
     String mailNotificationUsername,
@@ -286,6 +292,9 @@ class QBPreferencesModel with _$QBPreferencesModel {
     @JsonKey(name: 'resolve_peer_countries')
     @Default(true)
     bool resolvePeerCountries,
+    @JsonKey(name: 'resolve_peer_host_names')
+    @Default(false)
+    bool resolvePeerHostNames,
     @JsonKey(name: 'resume_data_storage_type')
     @Default('Legacy')
     String resumeDataStorageType,
@@ -397,6 +406,7 @@ class QBPreferencesModel with _$QBPreferencesModel {
     @JsonKey(name: 'validate_https_tracker_certificate')
     @Default(true)
     bool validateHttpsTrackerCertificate,
+    @JsonKey(name: 'web_ui_api_key') @Default('') String webUiApiKey,
     @JsonKey(name: 'web_ui_address') @Default('*') String webUiAddress,
     @JsonKey(name: 'web_ui_ban_duration') @Default(3600) int webUiBanDuration,
     @JsonKey(name: 'web_ui_clickjacking_protection_enabled')
@@ -435,8 +445,6 @@ class QBPreferencesModel with _$QBPreferencesModel {
     @Default(3600)
     int webUiSessionTimeout,
     @JsonKey(name: 'web_ui_upnp') @Default(false) bool webUiUpnp,
-    @JsonKey(name: 'web_ui_use_custom_http_headers_enabled')
-    @Default(false)
     @JsonKey(name: 'web_ui_use_custom_http_headers_enabled')
     @Default(false)
     bool webUiUseCustomHttpHeadersEnabled,

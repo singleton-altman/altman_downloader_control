@@ -1,6 +1,14 @@
 import 'package:altman_downloader_control/model/torrent_item_model.dart';
 import 'package:altman_downloader_control/utils/torrent_state_localizable.dart';
 
+double _qbParseDouble(dynamic v, [double fallback = 0.0]) {
+  if (v == null) return fallback;
+  if (v is double) return v;
+  if (v is int) return v.toDouble();
+  if (v is num) return v.toDouble();
+  return double.tryParse(v.toString()) ?? fallback;
+}
+
 /// qBittorrent 种子数据模型
 /// 兼容通用 TorrentModel
 class QBTorrentModel {
@@ -123,8 +131,8 @@ class QBTorrentModel {
         final value = (json['num_incomplete'] as num?)?.toInt();
         return value != null && value >= 0 ? value : 0;
       }(),
-      ratio: (json['ratio'] as num?)?.toDouble() ?? 0.0,
-      popularity: (json['popularity'] as num?)?.toDouble() ?? 0.0,
+      ratio: _qbParseDouble(json['ratio']),
+      popularity: _qbParseDouble(json['popularity']),
       hasPopularityField: json.containsKey('popularity'),
       eta: (json['eta'] as num?)?.toInt() ?? 0,
       state: json['state'] as String? ?? '',
@@ -152,11 +160,11 @@ class QBTorrentModel {
       tracker: json['tracker'] as String? ?? '',
       comment: json['comment'] as String? ?? '',
       magnetUri: json['magnet_uri'] as String? ?? '',
-      availability: (json['availability'] as num?)?.toDouble() ?? -1.0,
+      availability: _qbParseDouble(json['availability'], -1.0),
       hasAvailabilityField: json.containsKey('availability'),
-      dlLimit: (json['dl_limit'] as num?)?.toDouble() ?? -1,
-      upLimit: (json['up_limit'] as num?)?.toDouble() ?? -1,
-      timeActive: (json['time_active'] as num?)?.toDouble() ?? 0,
+      dlLimit: _qbParseDouble(json['dl_limit'], -1),
+      upLimit: _qbParseDouble(json['up_limit'], -1),
+      timeActive: _qbParseDouble(json['time_active']),
       seedingTime: (json['seeding_time'] as num?)?.toInt() ?? 0,
     );
   }
