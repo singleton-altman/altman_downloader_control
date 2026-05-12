@@ -4,8 +4,8 @@ import 'dart:ui';
 import 'package:altman_downloader_control/controller/downloader_config.dart';
 import 'package:altman_downloader_control/controller/protocol.dart';
 import 'package:altman_downloader_control/model/torrent_item_model.dart';
+import 'package:altman_downloader_control/page/downloader_profile_page.dart';
 import 'package:altman_downloader_control/page/qbittorrent/qb_log_page.dart';
-import 'package:altman_downloader_control/page/qbittorrent/qb_preferences_settings_page.dart';
 import 'package:altman_downloader_control/page/qbittorrent/qb_rss_list_page.dart';
 import 'package:altman_downloader_control/page/torrent_download_screen.dart';
 import 'package:altman_downloader_control/utils/toast_utils.dart';
@@ -909,9 +909,6 @@ class _DownloaderTorrentListPageState extends State<DownloaderTorrentListPage> {
   // 辅助方法：是否支持 RSS 功能（仅 qBittorrent 支持）
   bool get supportsRSS => isQBittorrent;
 
-  // 辅助方法：是否支持偏好设置（仅 qBittorrent 支持）
-  bool get supportsPreferences => isQBittorrent;
-
   @override
   Widget build(BuildContext context) {
     if (controller is QBController) {
@@ -1297,49 +1294,7 @@ class _DownloaderTorrentListPageState extends State<DownloaderTorrentListPage> {
 
   Future<void> _openFloatingFilterSheet(BuildContext context) async {
     if (controller is! QBController) return;
-    final qb = controller as QBController;
-    await showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) {
-        return Container(
-          height: MediaQuery.of(ctx).size.height * 0.72,
-          decoration: BoxDecoration(
-            color: Theme.of(ctx).colorScheme.surface,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(18)),
-          ),
-          child: CustomScrollView(
-            slivers: [
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 14, 16, 4),
-                  child: Row(
-                    children: [
-                      Text('筛选', style: Theme.of(ctx).textTheme.titleMedium),
-                      const Spacer(),
-                      if (qb.filter.value.hasFilters)
-                        CupertinoButton(
-                          padding: EdgeInsets.zero,
-                          minSize: 0,
-                          onPressed: qb.clearFilter,
-                          child: Text(
-                            '清空',
-                            style: TextStyle(
-                              color: Theme.of(ctx).colorScheme.error,
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-              ),
-              QBFilterWidget(controller: qb),
-            ],
-          ),
-        );
-      },
-    );
+    await showQBFilterDraggableSheet(context, controller as QBController);
   }
 
   Widget _buildErrorMessage(BuildContext context) {
@@ -2179,6 +2134,32 @@ class _DownloaderTorrentListPageState extends State<DownloaderTorrentListPage> {
       backgroundColor: colorScheme.surface,
       surfaceTintColor: Colors.transparent,
       elevation: 0,
+      leadingWidth: 52,
+      leading: Padding(
+        padding: const EdgeInsets.only(left: 4),
+        child: Center(
+          child: IconButton(
+            onPressed: () {
+              setState(() {
+                _selectionMode = false;
+                _selectedHashes.clear();
+              });
+            },
+            style: IconButton.styleFrom(
+              foregroundColor: colorScheme.onSurface,
+              backgroundColor: colorScheme.surfaceContainerHighest,
+              minimumSize: const Size(40, 40),
+              padding: EdgeInsets.zero,
+              shape: const CircleBorder(),
+            ),
+            icon: Icon(
+              Icons.arrow_back_rounded,
+              size: 22,
+              color: colorScheme.onSurface,
+            ),
+          ),
+        ),
+      ),
       title: Text(
         _selectedHashes.isEmpty ? '选择项目' : '已选 ${_selectedHashes.length} 项',
         style: TextStyle(
@@ -2274,16 +2255,25 @@ class _DownloaderTorrentListPageState extends State<DownloaderTorrentListPage> {
       elevation: 0,
       scrolledUnderElevation: 0,
       toolbarHeight: 52,
-      leadingWidth: 52,
+      leadingWidth: 56,
       leading: Padding(
-        padding: const EdgeInsets.all(6),
-        child: Material(
-          color: theme.primaryColor.withAlpha(48),
-          shape: const CircleBorder(),
-          clipBehavior: Clip.antiAlias,
-          child: InkWell(
-            onTap: () => Get.back(),
-            child: Icon(CupertinoIcons.chevron_back, color: theme.primaryColor),
+        padding: const EdgeInsets.only(left: 6),
+        child: Center(
+          child: IconButton(
+            onPressed: () => Get.back(),
+            style: IconButton.styleFrom(
+              foregroundColor: colorScheme.onSurface,
+              backgroundColor: colorScheme.surfaceContainerHighest,
+              minimumSize: const Size(44, 44),
+              maximumSize: const Size(44, 44),
+              padding: EdgeInsets.zero,
+              shape: const CircleBorder(),
+            ),
+            icon: Icon(
+              Icons.arrow_back_rounded,
+              size: 24,
+              color: colorScheme.onSurface,
+            ),
           ),
         ),
       ),
@@ -2312,6 +2302,9 @@ class _DownloaderTorrentListPageState extends State<DownloaderTorrentListPage> {
           ),
           onSelected: (v) {
             switch (v) {
+              case 'profile':
+                Get.to(() => DownloaderProfilePage(controller: controller));
+                break;
               case 'select':
                 setState(() => _selectionMode = true);
                 break;
@@ -2329,17 +2322,23 @@ class _DownloaderTorrentListPageState extends State<DownloaderTorrentListPage> {
                   );
                 }
                 break;
-              case 'prefs':
-                if (controller is QBController) {
-                  Get.to(
-                    () => QBPreferencesSettingsScreen(controller: controller),
-                    arguments: {'id': controller.config?.id ?? ''},
-                  );
-                }
-                break;
             }
           },
           itemBuilder: (ctx) => [
+            PopupMenuItem(
+              value: 'profile',
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.person_outline_rounded,
+                    size: 20,
+                    color: colorScheme.primary,
+                  ),
+                  const SizedBox(width: 12),
+                  const Text('下载器信息'),
+                ],
+              ),
+            ),
             PopupMenuItem(
               value: 'select',
               child: Row(
@@ -2384,21 +2383,6 @@ class _DownloaderTorrentListPageState extends State<DownloaderTorrentListPage> {
                 ),
               ),
             ],
-            if (supportsPreferences && controller is QBController)
-              PopupMenuItem(
-                value: 'prefs',
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.settings_outlined,
-                      size: 20,
-                      color: colorScheme.onSurface,
-                    ),
-                    const SizedBox(width: 12),
-                    const Text('设置'),
-                  ],
-                ),
-              ),
           ],
         ),
         const SizedBox(width: 2),

@@ -10,9 +10,14 @@ import '../utils/string_utils.dart';
 /// 通用的下载器筛选组件
 /// 支持所有下载器类型（qBittorrent、Transmission 等）
 class DownloaderFilterWidget extends StatefulWidget {
-  const DownloaderFilterWidget({super.key, required this.controller});
+  const DownloaderFilterWidget({
+    super.key,
+    required this.controller,
+    this.embeddedInSheet = false,
+  });
 
   final DownloaderControllerProtocol controller;
+  final bool embeddedInSheet;
 
   @override
   State<DownloaderFilterWidget> createState() => _DownloaderFilterWidgetState();
@@ -21,14 +26,21 @@ class DownloaderFilterWidget extends StatefulWidget {
 /// qBittorrent 筛选组件（向后兼容）
 /// 内部使用通用的 DownloaderFilterWidget
 class QBFilterWidget extends StatelessWidget {
-  const QBFilterWidget({super.key, required this.controller});
+  const QBFilterWidget({
+    super.key,
+    required this.controller,
+    this.embeddedInSheet = false,
+  });
 
   final QBController controller;
+  final bool embeddedInSheet;
 
   @override
   Widget build(BuildContext context) {
-    // 使用通用的筛选组件
-    return DownloaderFilterWidget(controller: controller);
+    return DownloaderFilterWidget(
+      controller: controller,
+      embeddedInSheet: embeddedInSheet,
+    );
   }
 }
 
@@ -44,7 +56,10 @@ class _DownloaderFilterWidgetState extends State<DownloaderFilterWidget> {
   Widget build(BuildContext context) {
     // 如果是 QBController，使用原有的筛选组件实现
     if (_isQBController && _qbController != null) {
-      return _QBFilterWidgetInternal(controller: _qbController!);
+      return _QBFilterWidgetInternal(
+        controller: _qbController!,
+        embeddedInSheet: widget.embeddedInSheet,
+      );
     }
 
     // 其他下载器类型，使用通用筛选组件
@@ -234,9 +249,13 @@ class _GenericFilterWidgetInternalState
 
 /// qBittorrent 筛选组件的内部实现（保留原有逻辑）
 class _QBFilterWidgetInternal extends StatefulWidget {
-  const _QBFilterWidgetInternal({required this.controller});
+  const _QBFilterWidgetInternal({
+    required this.controller,
+    this.embeddedInSheet = false,
+  });
 
   final QBController controller;
+  final bool embeddedInSheet;
 
   @override
   State<_QBFilterWidgetInternal> createState() =>
@@ -423,27 +442,27 @@ class _QBFilterWidgetInternalState extends State<_QBFilterWidgetInternal> {
       children: [
         Row(
           children: [
-            Icon(icon, size: 18, color: Theme.of(context).colorScheme.primary),
-            const SizedBox(width: 8),
+            Icon(icon, size: 16, color: Theme.of(context).colorScheme.primary),
+            const SizedBox(width: 6),
             Text(
               title,
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+              style: Theme.of(context).textTheme.titleSmall?.copyWith(
                 fontWeight: FontWeight.w700,
-                fontSize: 16,
+                fontSize: 13.5,
               ),
             ),
-            const SizedBox(width: 8),
+            const SizedBox(width: 6),
             Obx(
               () => selected.isEmpty
                   ? const SizedBox.shrink()
                   : Container(
                       padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 4,
+                        horizontal: 6,
+                        vertical: 2,
                       ),
                       decoration: BoxDecoration(
                         color: Theme.of(context).colorScheme.primaryContainer,
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius: BorderRadius.circular(8),
                       ),
                       child: Text(
                         '${selected.length}',
@@ -452,14 +471,14 @@ class _QBFilterWidgetInternalState extends State<_QBFilterWidgetInternal> {
                             context,
                           ).colorScheme.onPrimaryContainer,
                           fontWeight: FontWeight.w700,
-                          fontSize: 11,
+                          fontSize: 10,
                         ),
                       ),
                     ),
             ),
           ],
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 6),
         Obx(
           () => Column(
             children: options.asMap().entries.map((entry) {
@@ -469,37 +488,37 @@ class _QBFilterWidgetInternalState extends State<_QBFilterWidgetInternal> {
               final isSelected = selected.contains(option);
               final count = getCount(option);
               return Container(
-                margin: const EdgeInsets.only(bottom: 8),
+                margin: const EdgeInsets.only(bottom: 3),
                 decoration: BoxDecoration(
                   color: isSelected
                       ? Theme.of(context).colorScheme.primaryContainer
                       : Theme.of(context).colorScheme.surfaceContainerHighest
                             .withValues(alpha: 0.3),
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(8),
                   border: Border.all(
                     color: isSelected
                         ? Theme.of(context).colorScheme.primary
                         : Theme.of(
                             context,
                           ).colorScheme.outline.withValues(alpha: 0.1),
-                    width: isSelected ? 1.5 : 1,
+                    width: isSelected ? 1.25 : 1,
                   ),
                 ),
                 child: Material(
                   color: Colors.transparent,
                   child: InkWell(
                     onTap: () => onToggle(option),
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(8),
                     child: Padding(
                       padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 14,
+                        horizontal: 12,
+                        vertical: 7,
                       ),
                       child: Row(
                         children: [
                           Container(
-                            width: 24,
-                            height: 24,
+                            width: 20,
+                            height: 20,
                             decoration: BoxDecoration(
                               shape: BoxShape.circle,
                               border: Border.all(
@@ -509,7 +528,7 @@ class _QBFilterWidgetInternalState extends State<_QBFilterWidgetInternal> {
                                           .colorScheme
                                           .onSurfaceVariant
                                           .withValues(alpha: 0.3),
-                                width: 2,
+                                width: 1.5,
                               ),
                               color: isSelected
                                   ? Theme.of(context).colorScheme.primary
@@ -518,14 +537,14 @@ class _QBFilterWidgetInternalState extends State<_QBFilterWidgetInternal> {
                             child: isSelected
                                 ? Icon(
                                     Icons.check,
-                                    size: 16,
+                                    size: 13,
                                     color: Theme.of(
                                       context,
                                     ).colorScheme.onPrimary,
                                   )
                                 : null,
                           ),
-                          const SizedBox(width: 12),
+                          const SizedBox(width: 10),
                           Text(
                             label,
                             style: Theme.of(context).textTheme.bodyMedium
@@ -538,11 +557,11 @@ class _QBFilterWidgetInternalState extends State<_QBFilterWidgetInternal> {
                                   fontWeight: isSelected
                                       ? FontWeight.w600
                                       : FontWeight.normal,
-                                  fontSize: 14,
+                                  fontSize: 13,
                                 ),
                           ),
                           Text(
-                            '($count)',
+                            ' ($count)',
                             style: Theme.of(context).textTheme.labelSmall
                                 ?.copyWith(
                                   color: isSelected
@@ -550,16 +569,16 @@ class _QBFilterWidgetInternalState extends State<_QBFilterWidgetInternal> {
                                       : Theme.of(
                                           context,
                                         ).colorScheme.onSurfaceVariant,
-                                  fontWeight: FontWeight.w700,
-                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 11,
                                 ),
                           ),
                           const Spacer(),
                           if (getSize != null)
                             Container(
                               padding: const EdgeInsets.symmetric(
-                                horizontal: 10,
-                                vertical: 4,
+                                horizontal: 7,
+                                vertical: 2,
                               ),
                               decoration: BoxDecoration(
                                 color: isSelected
@@ -569,7 +588,7 @@ class _QBFilterWidgetInternalState extends State<_QBFilterWidgetInternal> {
                                           .colorScheme
                                           .surfaceContainerHighest
                                           .withValues(alpha: 0.4),
-                                borderRadius: BorderRadius.circular(12),
+                                borderRadius: BorderRadius.circular(8),
                                 border: Border.all(
                                   color: isSelected
                                       ? Theme.of(context).colorScheme.primary
@@ -584,7 +603,7 @@ class _QBFilterWidgetInternalState extends State<_QBFilterWidgetInternal> {
                                 children: [
                                   Icon(
                                     Icons.storage,
-                                    size: 12,
+                                    size: 11,
                                     color: isSelected
                                         ? Colors.white
                                         : Theme.of(context)
@@ -592,7 +611,7 @@ class _QBFilterWidgetInternalState extends State<_QBFilterWidgetInternal> {
                                               .onSurfaceVariant
                                               .withValues(alpha: 0.7),
                                   ),
-                                  const SizedBox(width: 4),
+                                  const SizedBox(width: 3),
                                   Text(
                                     getSize(option).toHumanReadableFileSize(),
                                     style: Theme.of(context)
@@ -606,7 +625,7 @@ class _QBFilterWidgetInternalState extends State<_QBFilterWidgetInternal> {
                                                     .onSurfaceVariant
                                                     .withValues(alpha: 0.8),
                                           fontWeight: FontWeight.w600,
-                                          fontSize: 11,
+                                          fontSize: 10,
                                         ),
                                   ),
                                 ],
@@ -629,17 +648,24 @@ class _QBFilterWidgetInternalState extends State<_QBFilterWidgetInternal> {
   Widget build(BuildContext context) {
     return SliverToBoxAdapter(
       child: Container(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+        padding: EdgeInsets.fromLTRB(
+          12,
+          widget.embeddedInSheet ? 0 : 6,
+          12,
+          12,
+        ),
         decoration: BoxDecoration(
           color: Theme.of(context).colorScheme.surface,
-          border: Border(
-            bottom: BorderSide(
-              color: Theme.of(
-                context,
-              ).colorScheme.outline.withValues(alpha: 0.1),
-              width: 0.5,
-            ),
-          ),
+          border: widget.embeddedInSheet
+              ? null
+              : Border(
+                  bottom: BorderSide(
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.outline.withValues(alpha: 0.1),
+                    width: 0.5,
+                  ),
+                ),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -662,7 +688,7 @@ class _QBFilterWidgetInternalState extends State<_QBFilterWidgetInternal> {
               getCount: _getStatusCount,
               getSize: _getStatusSize,
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 10),
             Obx(
               () => _buildFlatSection(
                 context: context,
@@ -685,7 +711,7 @@ class _QBFilterWidgetInternalState extends State<_QBFilterWidgetInternal> {
                 getSize: _getCategorySize,
               ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 10),
             Obx(
               () => _buildFlatSection(
                 context: context,
@@ -706,7 +732,7 @@ class _QBFilterWidgetInternalState extends State<_QBFilterWidgetInternal> {
                 getSize: _getTagSize,
               ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 10),
             Obx(
               () => _buildFlatSection(
                 context: context,
@@ -913,485 +939,100 @@ class _QBFilterWidgetInternalState extends State<_QBFilterWidgetInternal> {
     }
     return totalSize;
   }
-
-  /// 显示筛选 Sheet
-  void _showFilterSheet(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => _FilterSheet(
-        controller: widget.controller,
-        selectedStatuses: selectedStatuses,
-        selectedCategories: selectedCategories,
-        selectedTags: selectedTags,
-        selectedTrackers: selectedTrackers,
-        availableCategories: availableCategories,
-        availableTags: availableTags,
-        availableTrackers: availableTrackers,
-        onStatusToggle: (value) {
-          if (selectedStatuses.contains(value)) {
-            selectedStatuses.remove(value);
-          } else {
-            selectedStatuses.add(value);
-          }
-          _updateFilter();
-        },
-        onCategoryToggle: (value) {
-          if (selectedCategories.contains(value)) {
-            selectedCategories.remove(value);
-          } else {
-            selectedCategories.add(value);
-          }
-          _updateFilter();
-        },
-        onTagToggle: (value) {
-          if (selectedTags.contains(value)) {
-            selectedTags.remove(value);
-          } else {
-            selectedTags.add(value);
-          }
-          _updateFilter();
-        },
-        onTrackerToggle: (value) {
-          if (selectedTrackers.contains(value)) {
-            selectedTrackers.remove(value);
-          } else {
-            selectedTrackers.add(value);
-          }
-          _updateFilter();
-        },
-        onClear: _clearFilter,
-        getStatusCount: _getStatusCount,
-        getCategoryCount: _getCategoryCount,
-        getTagCount: _getTagCount,
-        getTrackerCount: _getTrackerCount,
-        getStatusSize: _getStatusSize,
-        getCategorySize: _getCategorySize,
-        getTagSize: _getTagSize,
-        getTrackerSize: _getTrackerSize,
-      ),
-    );
-  }
 }
 
-/// 筛选 Sheet 组件
-class _FilterSheet extends StatelessWidget {
-  const _FilterSheet({
-    required this.controller,
-    required this.selectedStatuses,
-    required this.selectedCategories,
-    required this.selectedTags,
-    required this.selectedTrackers,
-    required this.availableCategories,
-    required this.availableTags,
-    required this.availableTrackers,
-    required this.onStatusToggle,
-    required this.onCategoryToggle,
-    required this.onTagToggle,
-    required this.onTrackerToggle,
-    required this.onClear,
-    required this.getStatusCount,
-    required this.getCategoryCount,
-    required this.getTagCount,
-    required this.getTrackerCount,
-    this.getStatusSize,
-    this.getCategorySize,
-    this.getTagSize,
-    this.getTrackerSize,
-  });
-
-  final QBController controller;
-  final RxSet<String> selectedStatuses;
-  final RxSet<String> selectedCategories;
-  final RxSet<String> selectedTags;
-  final RxSet<String> selectedTrackers;
-  final RxList<String> availableCategories;
-  final RxList<String> availableTags;
-  final RxList<String> availableTrackers;
-  final Function(String) onStatusToggle;
-  final Function(String) onCategoryToggle;
-  final Function(String) onTagToggle;
-  final Function(String) onTrackerToggle;
-  final VoidCallback onClear;
-  final int Function(String) getStatusCount;
-  final int Function(String) getCategoryCount;
-  final int Function(String) getTagCount;
-  final int Function(String) getTrackerCount;
-  final int Function(String)? getStatusSize;
-  final int Function(String)? getCategorySize;
-  final int Function(String)? getTagSize;
-  final int Function(String)? getTrackerSize;
-
-  @override
-  Widget build(BuildContext context) {
-    return DraggableScrollableSheet(
-      initialChildSize: 0.85,
-      minChildSize: 0.5,
-      maxChildSize: 0.95,
-      builder: (context, scrollController) {
-        return Container(
-          decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.surface,
-            borderRadius: const BorderRadius.only(
-              topLeft: Radius.circular(20),
-              topRight: Radius.circular(20),
-            ),
-          ),
-          child: Column(
-            children: [
-              // 拖拽指示器
-              Container(
-                margin: const EdgeInsets.only(top: 12),
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: Theme.of(
-                    context,
-                  ).colorScheme.onSurfaceVariant.withValues(alpha: 0.3),
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-              // 标题栏
-              Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Row(
-                  children: [
-                    Text(
-                      '筛选条件',
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.w700,
-                        fontSize: 20,
-                      ),
-                    ),
-                    const Spacer(),
-                    if (controller.filter.value.hasFilters)
-                      TextButton.icon(
-                        onPressed: onClear,
-                        icon: const Icon(Icons.clear, size: 16),
-                        label: const Text('清除'),
-                        style: TextButton.styleFrom(
-                          foregroundColor: Theme.of(context).colorScheme.error,
-                        ),
-                      ),
-                    IconButton(
-                      icon: const Icon(Icons.close),
-                      onPressed: () => Navigator.of(context).pop(),
-                      tooltip: '关闭',
-                    ),
-                  ],
-                ),
-              ),
-              // 内容区域
-              Expanded(
-                child: SingleChildScrollView(
-                  controller: scrollController,
-                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // 状态筛选
-                      _buildFilterSection(
-                        context,
-                        title: '状态',
-                        icon: Icons.info_outline,
-                        options: QBFilterStatus.allStatuses
-                            .map((s) => s.value)
-                            .toList(),
-                        labels: QBFilterStatus.allStatuses
-                            .map((s) => s.label)
-                            .toList(),
-                        selected: selectedStatuses,
-                        onToggle: onStatusToggle,
-                        getCount: getStatusCount,
-                        getSize: getStatusSize,
-                      ),
-                      const SizedBox(height: 24),
-
-                      // 分类筛选
-                      Obx(
-                        () => availableCategories.isEmpty
-                            ? const SizedBox.shrink()
-                            : _buildFilterSection(
-                                context,
-                                title: '分类',
-                                icon: Icons.category,
-                                options: availableCategories,
-                                labels: availableCategories,
-                                selected: selectedCategories,
-                                onToggle: onCategoryToggle,
-                                getCount: getCategoryCount,
-                                getSize: getCategorySize,
-                              ),
-                      ),
-                      if (availableCategories.isNotEmpty)
-                        const SizedBox(height: 24),
-
-                      // 标签筛选
-                      Obx(
-                        () => availableTags.isEmpty
-                            ? const SizedBox.shrink()
-                            : _buildFilterSection(
-                                context,
-                                title: '标签',
-                                icon: Icons.label,
-                                options: availableTags,
-                                labels: availableTags,
-                                selected: selectedTags,
-                                onToggle: onTagToggle,
-                                getCount: getTagCount,
-                                getSize: getTagSize,
-                              ),
-                      ),
-                      if (availableTags.isNotEmpty) const SizedBox(height: 24),
-
-                      // 跟踪器筛选
-                      Obx(
-                        () => availableTrackers.isEmpty
-                            ? const SizedBox.shrink()
-                            : _buildFilterSection(
-                                context,
-                                title: '跟踪器',
-                                icon: Icons.dns,
-                                options: availableTrackers,
-                                labels: availableTrackers,
-                                selected: selectedTrackers,
-                                onToggle: onTrackerToggle,
-                                getCount: getTrackerCount,
-                                getSize: getTrackerSize,
-                              ),
-                      ),
-                      const SizedBox(height: 24),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildFilterSection(
-    BuildContext context, {
-    required String title,
-    required IconData icon,
-    required List<String> options,
-    required List<String> labels,
-    required RxSet<String> selected,
-    required Function(String) onToggle,
-    required int Function(String) getCount,
-    int Function(String)? getSize,
-  }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Icon(icon, size: 18, color: Theme.of(context).colorScheme.primary),
-            const SizedBox(width: 8),
-            Text(
-              title,
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w700,
-                fontSize: 16,
-              ),
-            ),
-            const SizedBox(width: 8),
-            Obx(
-              () => selected.isEmpty
-                  ? const SizedBox.shrink()
-                  : Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Theme.of(context).colorScheme.primaryContainer,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Text(
-                        '${selected.length}',
-                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                          color: Theme.of(
-                            context,
-                          ).colorScheme.onPrimaryContainer,
-                          fontWeight: FontWeight.w700,
-                          fontSize: 11,
-                        ),
-                      ),
-                    ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        Obx(
-          () => Column(
-            children: options.asMap().entries.map((entry) {
-              final index = entry.key;
-              final option = entry.value;
-              final label = labels.length > index ? labels[index] : option;
-              final isSelected = selected.contains(option);
-              final count = getCount(option);
-
-              return Container(
-                margin: const EdgeInsets.only(bottom: 8),
-                decoration: BoxDecoration(
-                  color: isSelected
-                      ? Theme.of(context).colorScheme.primaryContainer
-                      : Theme.of(context).colorScheme.surfaceContainerHighest
-                            .withValues(alpha: 0.3),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: isSelected
-                        ? Theme.of(context).colorScheme.primary
-                        : Theme.of(
-                            context,
-                          ).colorScheme.outline.withValues(alpha: 0.1),
-                    width: isSelected ? 1.5 : 1,
-                  ),
-                ),
-                child: Material(
-                  color: Colors.transparent,
-                  child: InkWell(
-                    onTap: () => onToggle(option),
-                    borderRadius: BorderRadius.circular(12),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 14,
-                      ),
-                      child: Row(
-                        children: [
-                          // 选中状态图标
-                          Container(
-                            width: 24,
-                            height: 24,
+Future<void> showQBFilterDraggableSheet(
+  BuildContext context,
+  QBController qb,
+) {
+  return showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.transparent,
+    builder: (ctx) {
+      return DraggableScrollableSheet(
+        expand: false,
+        initialChildSize: 0.5,
+        minChildSize: 0.26,
+        maxChildSize: 0.92,
+        builder: (ctx, scrollController) {
+          final scheme = Theme.of(ctx).colorScheme;
+          final bottomInset = MediaQuery.paddingOf(ctx).bottom;
+          return ClipRRect(
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(18)),
+            child: Material(
+              color: scheme.surface,
+              child: CustomScrollView(
+                controller: scrollController,
+                slivers: [
+                  SliverToBoxAdapter(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const SizedBox(height: 8),
+                        Center(
+                          child: Container(
+                            width: 36,
+                            height: 3,
                             decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              border: Border.all(
-                                color: isSelected
-                                    ? Theme.of(context).colorScheme.primary
-                                    : Theme.of(context)
-                                          .colorScheme
-                                          .onSurfaceVariant
-                                          .withValues(alpha: 0.3),
-                                width: 2,
+                              color: scheme.onSurfaceVariant.withValues(
+                                alpha: 0.3,
                               ),
-                              color: isSelected
-                                  ? Theme.of(context).colorScheme.primary
-                                  : Colors.transparent,
+                              borderRadius: BorderRadius.circular(2),
                             ),
-                            child: isSelected
-                                ? Icon(
-                                    Icons.check,
-                                    size: 16,
-                                    color: Theme.of(
-                                      context,
-                                    ).colorScheme.onPrimary,
-                                  )
-                                : null,
                           ),
-                          const SizedBox(width: 12),
-                          // 标签文本
-                          Text(
-                            label,
-                            style: Theme.of(context).textTheme.bodyMedium
-                                ?.copyWith(
-                                  color: isSelected
-                                      ? Theme.of(
-                                          context,
-                                        ).colorScheme.onPrimaryContainer
-                                      : Theme.of(context).colorScheme.onSurface,
-                                  fontWeight: isSelected
-                                      ? FontWeight.w600
-                                      : FontWeight.normal,
-                                  fontSize: 14,
-                                ),
-                          ),
-                          Text(
-                            '($count)',
-                            style: Theme.of(context).textTheme.labelSmall
-                                ?.copyWith(
-                                  color: isSelected
-                                      ? Colors.white
-                                      : Theme.of(
-                                          context,
-                                        ).colorScheme.onSurfaceVariant,
-                                  fontWeight: FontWeight.w700,
-                                  fontSize: 12,
-                                ),
-                          ),
-                          const Spacer(),
-                          if (getSize != null) ...[
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 10,
-                                vertical: 4,
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(12, 10, 4, 4),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            children: [
+                              Text(
+                                '筛选',
+                                style: Theme.of(ctx).textTheme.titleMedium
+                                    ?.copyWith(fontWeight: FontWeight.w700),
                               ),
-                              decoration: BoxDecoration(
-                                color: isSelected
-                                    ? Theme.of(context).colorScheme.primary
-                                          .withValues(alpha: 0.15)
-                                    : Theme.of(context)
-                                          .colorScheme
-                                          .surfaceContainerHighest
-                                          .withValues(alpha: 0.4),
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(
-                                  color: isSelected
-                                      ? Theme.of(context).colorScheme.primary
-                                            .withValues(alpha: 0.3)
-                                      : Theme.of(context).colorScheme.outline
-                                            .withValues(alpha: 0.1),
-                                  width: 1,
-                                ),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(
-                                    Icons.storage,
-                                    size: 12,
-                                    color: isSelected
-                                        ? Colors.white
-                                        : Theme.of(context)
-                                              .colorScheme
-                                              .onSurfaceVariant
-                                              .withValues(alpha: 0.7),
+                              const Spacer(),
+                              Obx(() {
+                                if (!qb.filter.value.hasFilters) {
+                                  return const SizedBox.shrink();
+                                }
+                                return TextButton(
+                                  onPressed: qb.clearFilter,
+                                  style: TextButton.styleFrom(
+                                    foregroundColor: scheme.error,
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                      vertical: 4,
+                                    ),
+                                    minimumSize: Size.zero,
+                                    tapTargetSize:
+                                        MaterialTapTargetSize.shrinkWrap,
                                   ),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    getSize(option).toHumanReadableFileSize(),
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .labelSmall
-                                        ?.copyWith(
-                                          color: isSelected
-                                              ? Colors.white
-                                              : Theme.of(context)
-                                                    .colorScheme
-                                                    .onSurfaceVariant
-                                                    .withValues(alpha: 0.8),
-                                          fontWeight: FontWeight.w600,
-                                          fontSize: 11,
-                                        ),
-                                  ),
-                                ],
+                                  child: const Text('清空'),
+                                );
+                              }),
+                              IconButton(
+                                icon: const Icon(Icons.close),
+                                tooltip: '关闭',
+                                onPressed: () => Navigator.of(ctx).pop(),
                               ),
-                            ),
-                          ],
-                        ],
-                      ),
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                ),
-              );
-            }).toList(),
-          ),
-        ),
-      ],
-    );
-  }
+                  QBFilterWidget(controller: qb, embeddedInSheet: true),
+                  SliverToBoxAdapter(
+                    child: SizedBox(height: bottomInset + 8),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      );
+    },
+  );
 }
