@@ -40,6 +40,7 @@ class TorrentListItem extends StatelessWidget {
   final DownloaderControllerProtocol controller;
   final bool selectionMode;
   final bool selected;
+  final bool compact;
   final VoidCallback? onToggleSelected;
   final VoidCallback? onLongPressEnterSelect;
 
@@ -49,6 +50,7 @@ class TorrentListItem extends StatelessWidget {
     required this.controller,
     this.selectionMode = false,
     this.selected = false,
+    this.compact = false,
     this.onToggleSelected,
     this.onLongPressEnterSelect,
   });
@@ -89,20 +91,23 @@ class TorrentListItem extends StatelessWidget {
         icon: Icons.storage_outlined,
         label: '大小',
         value: totalSize,
+        compact: compact,
       ),
       _buildMetricTile(
         context: context,
         icon: Icons.upload_outlined,
         label: '已上传',
         value: torrent.uploaded.toHumanReadableFileSize(round: 2),
+        compact: compact,
       ),
       _buildMetricTile(
         context: context,
         icon: Icons.swap_horiz_rounded,
         label: '比率',
         value: torrent.ratio.toStringAsFixed(2),
+        compact: compact,
       ),
-      if (torrent.eta > 0 && torrent.isDownloading)
+      if (!compact && torrent.eta > 0 && torrent.isDownloading)
         _buildMetricTile(
           context: context,
           icon: Icons.schedule_outlined,
@@ -110,7 +115,7 @@ class TorrentListItem extends StatelessWidget {
           value: _formatETA(torrent.eta),
           accentColor: colorScheme.primary,
         ),
-      if (torrent.popularity > 0)
+      if (!compact && torrent.popularity > 0)
         _buildMetricTile(
           context: context,
           icon: Icons.local_fire_department_outlined,
@@ -118,7 +123,7 @@ class TorrentListItem extends StatelessWidget {
           value: _getPopularityText(torrent.popularity),
           accentColor: Colors.orange.shade700,
         ),
-      if (torrent.availability >= 0)
+      if (!compact && torrent.availability >= 0)
         _buildMetricTile(
           context: context,
           icon: Icons.cloud_done_outlined,
@@ -145,19 +150,22 @@ class TorrentListItem extends StatelessWidget {
               }
             },
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 5.0),
+              padding: EdgeInsets.symmetric(
+                horizontal: compact ? 4.0 : 16.0,
+                vertical: compact ? 2.0 : 5.0,
+              ),
               child: Container(
                 decoration: BoxDecoration(
                   color: cardFill,
-                  borderRadius: BorderRadius.circular(16),
+                  borderRadius: BorderRadius.circular(compact ? 12 : 16),
                   border: Border.all(
                     color: borderSide.color,
                     width: borderSide.width,
                   ),
                 ),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12.0,
-                  vertical: 10.0,
+                padding: EdgeInsets.symmetric(
+                  horizontal: compact ? 8.0 : 12.0,
+                  vertical: compact ? 6.0 : 10.0,
                 ),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
@@ -174,25 +182,26 @@ class TorrentListItem extends StatelessWidget {
                             style: textTheme.titleSmall?.copyWith(
                               color: colorScheme.onSurface,
                               fontWeight: FontWeight.w700,
-                              fontSize: 14,
+                              fontSize: compact ? 13 : 14,
                               height: 1.12,
                             ),
-                            maxLines: 1,
+                            maxLines: compact ? 1 : 1,
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 6),
+                    SizedBox(height: compact ? 4 : 6),
                     Wrap(
-                      spacing: 5,
-                      runSpacing: 3,
+                      spacing: compact ? 4 : 5,
+                      runSpacing: compact ? 2 : 3,
                       children: [
                         _buildMetaChip(
                           context: context,
                           icon: Icons.satellite_outlined,
                           text: _getStateText(),
                           color: stateColor,
+                          compact: compact,
                         ),
                         if (torrent.category.isNotEmpty)
                           _buildMetaChip(
@@ -200,8 +209,9 @@ class TorrentListItem extends StatelessWidget {
                             icon: Icons.folder_outlined,
                             text: torrent.category,
                             color: colorScheme.primary,
+                            compact: compact,
                           ),
-                        if (torrent.tags.isNotEmpty)
+                        if (!compact && torrent.tags.isNotEmpty)
                           _buildMetaChip(
                             context: context,
                             icon: Icons.sell_outlined,
@@ -211,34 +221,41 @@ class TorrentListItem extends StatelessWidget {
                           ),
                       ],
                     ),
-                    const SizedBox(height: 6),
+                    SizedBox(height: compact ? 4 : 6),
                     _buildProgressPanel(
                       context: context,
                       progressPercent: progressPercent,
                       progressLabel: progressLabel,
                       stateColor: stateColor,
+                      compact: compact,
                     ),
-                    const SizedBox(height: 6),
-                    _buildMetricsSection(context: context, items: metricTiles),
-                    const SizedBox(height: 5),
-                    Wrap(
-                      spacing: 7,
-                      runSpacing: 2,
-                      crossAxisAlignment: WrapCrossAlignment.center,
-                      children: [
-                        _buildFooterMeta(
-                          context: context,
-                          icon: Icons.access_time_rounded,
-                          text: _formatTimestamp(torrent.addedOn),
-                        ),
-                        _buildFooterMeta(
-                          context: context,
-                          icon: Icons.hub_outlined,
-                          text:
-                              '做种 ${torrent.numComplete} / 下载 ${torrent.numIncomplete}',
-                        ),
-                      ],
+                    SizedBox(height: compact ? 4 : 6),
+                    _buildMetricsSection(
+                      context: context,
+                      items: metricTiles,
+                      compact: compact,
                     ),
+                    if (!compact) ...[
+                      const SizedBox(height: 5),
+                      Wrap(
+                        spacing: 7,
+                        runSpacing: 2,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        children: [
+                          _buildFooterMeta(
+                            context: context,
+                            icon: Icons.access_time_rounded,
+                            text: _formatTimestamp(torrent.addedOn),
+                          ),
+                          _buildFooterMeta(
+                            context: context,
+                            icon: Icons.hub_outlined,
+                            text:
+                                '做种 ${torrent.numComplete} / 下载 ${torrent.numIncomplete}',
+                          ),
+                        ],
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -264,11 +281,12 @@ class TorrentListItem extends StatelessWidget {
     required double progressPercent,
     required String progressLabel,
     required Color stateColor,
+    bool compact = false,
   }) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
     final speedItems = <Widget>[
-      if (torrent.dlspeed > 0)
+      if (!compact && torrent.dlspeed > 0)
         _buildFlowMetric(
           context: context,
           icon: Icons.arrow_downward_rounded,
@@ -276,7 +294,7 @@ class TorrentListItem extends StatelessWidget {
           value: '${torrent.dlspeed.toHumanReadableFileSize(round: 1)}/s',
           color: colorScheme.primary,
         ),
-      if (torrent.upspeed > 0)
+      if (!compact && torrent.upspeed > 0)
         _buildFlowMetric(
           context: context,
           icon: Icons.arrow_upward_rounded,
@@ -295,37 +313,46 @@ class TorrentListItem extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               Expanded(
-                child: RichText(
-                  text: TextSpan(
-                    children: [
-                      TextSpan(
-                        text: '当前进度: ',
-                        style: textTheme.bodySmall?.copyWith(
-                          color: colorScheme.onSurfaceVariant,
-                          fontSize: 11.5,
-                        ),
-                      ),
-                      TextSpan(
-                        text: progressLabel,
+                child: compact
+                    ? Text(
+                        progressLabel,
                         style: textTheme.bodySmall?.copyWith(
                           color: colorScheme.primary,
-                          fontSize: 11.5,
+                          fontSize: 10.5,
                           fontWeight: FontWeight.w800,
                         ),
+                      )
+                    : RichText(
+                        text: TextSpan(
+                          children: [
+                            TextSpan(
+                              text: '当前进度: ',
+                              style: textTheme.bodySmall?.copyWith(
+                                color: colorScheme.onSurfaceVariant,
+                                fontSize: 11.5,
+                              ),
+                            ),
+                            TextSpan(
+                              text: progressLabel,
+                              style: textTheme.bodySmall?.copyWith(
+                                color: colorScheme.primary,
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                    ],
-                  ),
-                ),
               ),
               if (speedItems.isNotEmpty) ...speedItems,
             ],
           ),
-          const SizedBox(height: 6),
+          SizedBox(height: compact ? 3 : 6),
           ClipRRect(
             borderRadius: BorderRadius.circular(999),
             child: LinearProgressIndicator(
               value: _getVisualProgressValue(progressPercent),
-              minHeight: 5,
+              minHeight: compact ? 4 : 5,
               backgroundColor: colorScheme.surfaceContainerHighest.withValues(
                 alpha: 0.5,
               ),
@@ -353,17 +380,22 @@ class TorrentListItem extends StatelessWidget {
     required String label,
     required String value,
     Color? accentColor,
+    bool compact = false,
   }) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
     final color = accentColor ?? colorScheme.onSurfaceVariant;
+    final fontSize = compact ? 10.0 : 11.0;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      padding: EdgeInsets.symmetric(
+        horizontal: compact ? 5 : 8,
+        vertical: compact ? 2 : 4,
+      ),
       decoration: BoxDecoration(
         color: colorScheme.surfaceContainerHigh.withValues(
           alpha: isDarkTheme(context) ? 0.28 : 0.82,
         ),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(compact ? 8 : 12),
         border: Border.all(
           color: colorScheme.outlineVariant.withValues(
             alpha: isDarkTheme(context) ? 0.18 : 0.12,
@@ -375,24 +407,24 @@ class TorrentListItem extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          Icon(icon, size: 12, color: color),
-          const SizedBox(width: 6),
+          Icon(icon, size: compact ? 11 : 12, color: color),
+          SizedBox(width: compact ? 4 : 6),
           Text(
             label,
             style: textTheme.labelSmall?.copyWith(
               color: colorScheme.onSurfaceVariant,
               fontWeight: FontWeight.w600,
-              fontSize: 11,
+              fontSize: fontSize,
               height: 1.0,
             ),
           ),
-          const SizedBox(width: 8),
+          SizedBox(width: compact ? 4 : 8),
           Text(
             value,
             style: textTheme.titleSmall?.copyWith(
               color: accentColor ?? colorScheme.onSurface,
               fontWeight: FontWeight.w700,
-              fontSize: 11,
+              fontSize: fontSize,
               height: 1.0,
             ),
           ),
@@ -404,19 +436,23 @@ class TorrentListItem extends StatelessWidget {
   Widget _buildMetricsSection({
     required BuildContext context,
     required List<Widget> items,
+    bool compact = false,
   }) {
     final colorScheme = Theme.of(context).colorScheme;
     final isDark = isDarkTheme(context);
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 5),
+      padding: EdgeInsets.symmetric(
+        horizontal: compact ? 4 : 6,
+        vertical: compact ? 3 : 5,
+      ),
       decoration: BoxDecoration(
         color: colorScheme.surfaceContainerHighest.withValues(
           alpha: isDark ? 0.2 : 0.14,
         ),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(compact ? 8 : 12),
       ),
-      child: Wrap(spacing: 4, runSpacing: 4, children: items),
+      child: Wrap(spacing: compact ? 3 : 4, runSpacing: compact ? 2 : 4, children: items),
     );
   }
 
@@ -490,23 +526,27 @@ class TorrentListItem extends StatelessWidget {
     required String text,
     required Color color,
     double? maxWidth,
+    bool compact = false,
   }) {
     final textTheme = Theme.of(context).textTheme;
     return Container(
       constraints: maxWidth == null
-          ? const BoxConstraints(minHeight: 20)
-          : BoxConstraints(minHeight: 20, maxWidth: maxWidth),
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+          ? BoxConstraints(minHeight: compact ? 18 : 20)
+          : BoxConstraints(minHeight: compact ? 18 : 20, maxWidth: maxWidth),
+      padding: EdgeInsets.symmetric(
+        horizontal: compact ? 5 : 6,
+        vertical: compact ? 1 : 2,
+      ),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(compact ? 6 : 8),
         border: Border.all(color: color.withValues(alpha: 0.18), width: 0.6),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 12, color: color),
-          const SizedBox(width: 4),
+          Icon(icon, size: compact ? 11 : 12, color: color),
+          SizedBox(width: compact ? 3 : 4),
           Flexible(
             child: Text(
               text,
@@ -514,7 +554,7 @@ class TorrentListItem extends StatelessWidget {
               overflow: TextOverflow.ellipsis,
               style: textTheme.bodySmall?.copyWith(
                 color: color,
-                fontSize: 10,
+                fontSize: compact ? 9.5 : 10,
                 fontWeight: FontWeight.w600,
                 height: 1.1,
               ),

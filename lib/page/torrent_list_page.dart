@@ -937,7 +937,6 @@ class _DownloaderTorrentListPageState extends State<DownloaderTorrentListPage> {
         child: CustomScrollView(
           slivers: [
             SliverToBoxAdapter(child: _buildErrorMessage(context)),
-            _buildTorrentInfo(context),
             _buildTorrentList(context),
             SliverToBoxAdapter(
               child: SizedBox(
@@ -949,81 +948,6 @@ class _DownloaderTorrentListPageState extends State<DownloaderTorrentListPage> {
           ],
         ),
       ),
-    );
-  }
-
-  Widget _buildTorrentInfo(BuildContext context) {
-    return SliverToBoxAdapter(
-      child: Obx(() {
-        final displayTorrents = filteredTorrentsList;
-        if (displayTorrents.isEmpty) {
-          return const SizedBox.shrink();
-        }
-
-        // 计算总尺寸
-        int totalSize = 0;
-        for (var torrent in displayTorrents) {
-          final size = torrent.totalSize > 0 ? torrent.totalSize : torrent.size;
-          totalSize += size;
-        }
-
-        return Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
-
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              // 标题行：标题 + 排序按钮
-              Text(
-                '种子列表',
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w600,
-                  fontSize: 17,
-                  letterSpacing: -0.4,
-                  color: Theme.of(context).colorScheme.onSurface,
-                ),
-              ),
-              Spacer(),
-              // 信息行：种子数量和体积
-              Icon(
-                Icons.info_outline_rounded,
-                size: 14,
-                color: Theme.of(context).colorScheme.primary,
-              ),
-              const SizedBox(width: 6),
-              Text(
-                '${displayTorrents.length} 个种子',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Theme.of(
-                    context,
-                  ).colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
-                  fontWeight: FontWeight.w500,
-                  fontSize: 13,
-                ),
-              ),
-              const SizedBox(width: 16),
-              Icon(
-                Icons.storage_rounded,
-                size: 14,
-                color: Theme.of(
-                  context,
-                ).colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
-              ),
-              const SizedBox(width: 6),
-              Text(
-                totalSize.toHumanReadableFileSize(),
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Theme.of(
-                    context,
-                  ).colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
-                  fontWeight: FontWeight.w500,
-                  fontSize: 13,
-                ),
-              ),
-            ],
-          ),
-        );
-      }),
     );
   }
 
@@ -1348,6 +1272,33 @@ class _DownloaderTorrentListPageState extends State<DownloaderTorrentListPage> {
     return max(2, (usable / (slot + gap)).floor());
   }
 
+  static const _torrentGridHPad = 16.0;
+  static const _torrentGridGap = 6.0;
+  static const _torrentGridMinCardWidth = 300.0;
+  static const _torrentGridMainAxisExtent = 138.0;
+
+  int _torrentGridCrossAxisCount(double width) {
+    if (width < 600) return 1;
+    final usable = width - _torrentGridHPad;
+    return max(
+      2,
+      min(
+        6,
+        ((usable + _torrentGridGap) / (_torrentGridMinCardWidth + _torrentGridGap))
+            .floor(),
+      ),
+    );
+  }
+
+  SliverGridDelegate _torrentGridDelegate(double width) {
+    return SliverGridDelegateWithFixedCrossAxisCount(
+      crossAxisCount: _torrentGridCrossAxisCount(width),
+      mainAxisSpacing: _torrentGridGap,
+      crossAxisSpacing: _torrentGridGap,
+      mainAxisExtent: _torrentGridMainAxisExtent,
+    );
+  }
+
   Widget _buildSelectionGridTile(BuildContext context, TorrentModel torrent) {
     final selected = _selectedHashes.contains(torrent.hash);
     final scheme = Theme.of(context).colorScheme;
@@ -1622,25 +1573,24 @@ class _DownloaderTorrentListPageState extends State<DownloaderTorrentListPage> {
       return SliverPadding(
         padding: const EdgeInsets.symmetric(horizontal: 8),
         sliver: SliverGrid.builder(
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 2,
-            mainAxisSpacing: 1,
-            crossAxisSpacing: 1,
-            childAspectRatio: 1.8,
-          ),
+          gridDelegate: _torrentGridDelegate(MediaQuery.sizeOf(context).width),
           itemCount: displayTorrents.length,
           itemBuilder: (context, index) {
             final torrent = displayTorrents[index];
-            return TorrentListItem(
-              torrent: torrent,
-              controller: controller,
-              selectionMode: _selectionMode,
-              selected: _selectedHashes.contains(torrent.hash),
-              onToggleSelected: () => _toggleHash(torrent.hash),
-              onLongPressEnterSelect: () => setState(() {
-                _selectionMode = true;
-                _selectedHashes.add(torrent.hash);
-              }),
+            return ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: TorrentListItem(
+                torrent: torrent,
+                controller: controller,
+                compact: true,
+                selectionMode: _selectionMode,
+                selected: _selectedHashes.contains(torrent.hash),
+                onToggleSelected: () => _toggleHash(torrent.hash),
+                onLongPressEnterSelect: () => setState(() {
+                  _selectionMode = true;
+                  _selectedHashes.add(torrent.hash);
+                }),
+              ),
             );
           },
         ),
@@ -1697,16 +1647,11 @@ class _DownloaderTorrentListPageState extends State<DownloaderTorrentListPage> {
     return SliverPadding(
       padding: const EdgeInsets.symmetric(horizontal: 8),
       sliver: SliverGrid.builder(
-        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 2,
-          mainAxisSpacing: 8,
-          crossAxisSpacing: 8,
-          childAspectRatio: 2.15,
-        ),
+        gridDelegate: _torrentGridDelegate(MediaQuery.sizeOf(context).width),
         itemCount: 8,
         itemBuilder: (context, index) {
           return Container(
-            padding: const EdgeInsets.all(14),
+            padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
               color: Theme.of(context).colorScheme.surface,
               borderRadius: BorderRadius.circular(14),
@@ -2386,75 +2331,121 @@ class _DownloaderTorrentListPageState extends State<DownloaderTorrentListPage> {
         const SizedBox(width: 2),
       ],
       bottom: PreferredSize(
-        preferredSize: const Size.fromHeight(36),
-        child: Column(
-          children: [
-            _buildAppBarSpeedStrip(context),
-            Container(
-              decoration: BoxDecoration(
-                border: Border(
-                  bottom: BorderSide(
-                    color: isDark
-                        ? colorScheme.outline.withValues(alpha: 0.2)
-                        : colorScheme.outline.withValues(alpha: 0.1),
-                    width: 0.5,
-                  ),
-                ),
+        preferredSize: const Size.fromHeight(31),
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            border: Border(
+              bottom: BorderSide(
+                color: isDark
+                    ? colorScheme.outline.withValues(alpha: 0.2)
+                    : colorScheme.outline.withValues(alpha: 0.1),
+                width: 0.5,
               ),
             ),
-          ],
+          ),
+          child: _buildAppBarSummaryStrip(context),
         ),
       ),
     );
   }
 
-  Widget _buildAppBarSpeedStrip(BuildContext context) {
+  Widget _summaryDot(ColorScheme scheme) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 5),
+      child: Text(
+        '·',
+        style: TextStyle(
+          color: scheme.onSurfaceVariant.withValues(alpha: 0.45),
+          fontSize: 11,
+          height: 1,
+        ),
+      ),
+    );
+  }
+
+  Widget _summaryMetric({
+    required IconData icon,
+    required Color iconColor,
+    required String text,
+    required TextStyle? textStyle,
+  }) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 12, color: iconColor),
+        const SizedBox(width: 3),
+        Text(text, style: textStyle),
+      ],
+    );
+  }
+
+  Widget _buildAppBarSummaryStrip(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final textStyle = theme.textTheme.labelSmall?.copyWith(
+      color: scheme.onSurfaceVariant,
+      fontWeight: FontWeight.w500,
+      fontSize: 11.5,
+      height: 1,
+      letterSpacing: -0.1,
+      fontFeatures: const [FontFeature.tabularFigures()],
+    );
+
     return Obx(() {
       final state = controller.serverStateUniversal;
       final dl = state?.dlInfoSpeed ?? 0;
       final ul = state?.upInfoSpeed ?? 0;
       final dht = state?.dhtNodes ?? 0;
-      final textStyle = Theme.of(context).textTheme.bodySmall?.copyWith(
-        color: Theme.of(context).colorScheme.onSurfaceVariant,
-        fontWeight: FontWeight.w500,
-      );
-      return Container(
-        height: 34,
-        padding: const EdgeInsets.symmetric(horizontal: 16),
+      final displayTorrents = filteredTorrentsList;
+      var totalSize = 0;
+      for (final torrent in displayTorrents) {
+        totalSize += torrent.totalSize > 0 ? torrent.totalSize : torrent.size;
+      }
+
+      return SizedBox(
+        height: 30,
         child: SingleChildScrollView(
           scrollDirection: Axis.horizontal,
           physics: const BouncingScrollPhysics(),
+          padding: const EdgeInsets.symmetric(horizontal: 12),
           child: Row(
             children: [
-              Icon(
-                Icons.arrow_downward_rounded,
-                size: 14,
-                color: Theme.of(context).colorScheme.primary,
+              _summaryMetric(
+                icon: Icons.arrow_downward_rounded,
+                iconColor: scheme.primary,
+                text: '${dl.toHumanReadableFileSize(round: 1)}/s',
+                textStyle: textStyle,
               ),
-              const SizedBox(width: 4),
-              Text(
-                '${dl.toHumanReadableFileSize(round: 1)}/s',
-                style: textStyle,
+              _summaryDot(scheme),
+              _summaryMetric(
+                icon: Icons.arrow_upward_rounded,
+                iconColor: scheme.secondary,
+                text: '${ul.toHumanReadableFileSize(round: 1)}/s',
+                textStyle: textStyle,
               ),
-              const SizedBox(width: 14),
-              Icon(
-                Icons.arrow_upward_rounded,
-                size: 14,
-                color: Theme.of(context).colorScheme.secondary,
+              _summaryDot(scheme),
+              _summaryMetric(
+                icon: Icons.public_rounded,
+                iconColor: scheme.tertiary,
+                text: 'DHT $dht',
+                textStyle: textStyle,
               ),
-              const SizedBox(width: 4),
-              Text(
-                '${ul.toHumanReadableFileSize(round: 1)}/s',
-                style: textStyle,
+              _summaryDot(scheme),
+              _summaryMetric(
+                icon: Icons.format_list_bulleted_rounded,
+                iconColor: scheme.onSurfaceVariant.withValues(alpha: 0.75),
+                text: '${displayTorrents.length} 个',
+                textStyle: textStyle,
               ),
-              const SizedBox(width: 14),
-              Icon(
-                Icons.public_rounded,
-                size: 14,
-                color: Theme.of(context).colorScheme.tertiary,
-              ),
-              const SizedBox(width: 4),
-              Text('DHT $dht', style: textStyle),
+              if (displayTorrents.isNotEmpty) ...[
+                _summaryDot(scheme),
+                _summaryMetric(
+                  icon: Icons.storage_rounded,
+                  iconColor: scheme.onSurfaceVariant.withValues(alpha: 0.75),
+                  text: totalSize.toHumanReadableFileSize(),
+                  textStyle: textStyle,
+                ),
+              ],
             ],
           ),
         ),
