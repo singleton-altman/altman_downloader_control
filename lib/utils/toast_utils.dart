@@ -16,7 +16,7 @@ class ToastUtil {
     Get.snackbar(
       title ?? '成功',
       message,
-      backgroundColor: CupertinoColors.systemGreen.withOpacity(0.9),
+      backgroundColor: CupertinoColors.systemGreen.withValues(alpha: 0.9),
       colorText: CupertinoColors.white,
       duration: duration,
       snackPosition: SnackPosition.BOTTOM,
@@ -48,7 +48,7 @@ class ToastUtil {
     Get.snackbar(
       title ?? '错误',
       message,
-      backgroundColor: CupertinoColors.systemRed.withOpacity(0.9),
+      backgroundColor: CupertinoColors.systemRed.withValues(alpha: 0.9),
       colorText: CupertinoColors.white,
       duration: duration,
       snackPosition: SnackPosition.TOP,
@@ -141,7 +141,7 @@ class ToastUtil {
     Get.snackbar(
       title ?? '提示',
       message,
-      backgroundColor: CupertinoColors.systemBlue.withOpacity(0.9),
+      backgroundColor: CupertinoColors.systemBlue.withValues(alpha: 0.9),
       colorText: CupertinoColors.white,
       duration: duration,
       snackPosition: SnackPosition.BOTTOM,
@@ -160,7 +160,7 @@ class ToastUtil {
     Get.snackbar(
       title ?? '加载中',
       message,
-      backgroundColor: CupertinoColors.systemGrey.withOpacity(0.9),
+      backgroundColor: CupertinoColors.systemGrey.withValues(alpha: 0.9),
       colorText: CupertinoColors.white,
       duration: const Duration(days: 1), // 长时间显示，需要手动关闭
       snackPosition: SnackPosition.TOP,

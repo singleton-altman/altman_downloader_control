@@ -24,7 +24,7 @@ class QBDioClient {
     final data = o.data;
     if (data == null) return '';
     if (data is Map && o.path.contains('auth/login')) {
-      final m = Map<String, dynamic>.from(data as Map);
+      final m = Map<String, dynamic>.from(data);
       if (m['password'] != null) m['password'] = '***';
       return m.toString();
     }
@@ -50,8 +50,9 @@ class QBDioClient {
       InterceptorsWrapper(
         onRequest: (options, handler) {
           final extra = _safeRequestData(options);
-          final cookieNote =
-              options.headers['Cookie'] != null ? ' hasCookieHdr' : '';
+          final cookieNote = options.headers['Cookie'] != null
+              ? ' hasCookieHdr'
+              : '';
           _log.d(
             'QB HTTP → ${options.method} ${options.uri}$cookieNote'
             '${extra.isNotEmpty ? ' $extra' : ''}',
@@ -172,7 +173,9 @@ class QBDioClient {
     try {
       final response = await _dio.get(
         'api/v2/app/version',
-        options: Options(validateStatus: (status) => status != null && status < 500),
+        options: Options(
+          validateStatus: (status) => status != null && status < 500,
+        ),
       );
 
       final code = response.statusCode ?? 0;
@@ -185,7 +188,9 @@ class QBDioClient {
       }
 
       if (code == 200) return true;
-      _log.w('QB checkConnection: 未预期 status=$code body ${_shortBody(response.data)}');
+      _log.w(
+        'QB checkConnection: 未预期 status=$code body ${_shortBody(response.data)}',
+      );
       return false;
     } catch (e, st) {
       _log.e('QB checkConnection 异常: $e\n$st');

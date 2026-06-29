@@ -78,7 +78,10 @@ class DownloaderFilterStatus {
     DownloaderFilterStatus(value: 'stalled', label: '停滞'),
     DownloaderFilterStatus(value: 'stalled_uploading', label: '上传停滞'),
     DownloaderFilterStatus(value: 'stalled_download', label: '下载停滞'),
+    DownloaderFilterStatus(value: 'queued_upload', label: '排队上传'),
+    DownloaderFilterStatus(value: 'queued_download', label: '排队下载'),
     DownloaderFilterStatus(value: 'checking', label: '检查中'),
+    DownloaderFilterStatus(value: 'allocating', label: '分配空间'),
     DownloaderFilterStatus(value: 'moving', label: '移动中'),
     DownloaderFilterStatus(value: 'errored', label: '错误'),
   ];

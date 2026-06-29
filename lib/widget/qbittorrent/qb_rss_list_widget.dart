@@ -557,7 +557,7 @@ class _QBRssListWidgetState extends State<QBRssListWidget> {
                     TextButton.icon(
                       onPressed: () async {
                         try {
-                          final uri = Uri.parse(item.torrentURL!);
+                          Uri.parse(item.torrentURL!);
                           // if (await canLaunchUrl(uri)) {
                           //   await launchUrl(
                           //     uri,
@@ -583,7 +583,7 @@ class _QBRssListWidgetState extends State<QBRssListWidget> {
                     TextButton.icon(
                       onPressed: () async {
                         try {
-                          final uri = Uri.parse(item.link!);
+                          Uri.parse(item.link!);
                           // if (await canLaunchUrl(uri)) {
                           //   await launchUrl(
                           //     uri,

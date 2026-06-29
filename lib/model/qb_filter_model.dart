@@ -1,5 +1,3 @@
-import 'dart:convert';
-
 /// qBittorrent 筛选条件模型
 class QBFilterModel {
   /// 搜索关键词
@@ -69,19 +67,23 @@ class QBFilterModel {
   factory QBFilterModel.fromJson(Map<String, dynamic> json) {
     return QBFilterModel(
       searchKeyword: json['searchKeyword'] as String? ?? '',
-      selectedStatuses: (json['selectedStatuses'] as List<dynamic>?)
+      selectedStatuses:
+          (json['selectedStatuses'] as List<dynamic>?)
               ?.map((e) => e.toString())
               .toList() ??
           [],
-      selectedCategories: (json['selectedCategories'] as List<dynamic>?)
+      selectedCategories:
+          (json['selectedCategories'] as List<dynamic>?)
               ?.map((e) => e.toString())
               .toList() ??
           [],
-      selectedTags: (json['selectedTags'] as List<dynamic>?)
+      selectedTags:
+          (json['selectedTags'] as List<dynamic>?)
               ?.map((e) => e.toString())
               .toList() ??
           [],
-      selectedTrackers: (json['selectedTrackers'] as List<dynamic>?)
+      selectedTrackers:
+          (json['selectedTrackers'] as List<dynamic>?)
               ?.map((e) => e.toString())
               .toList() ??
           [],
@@ -94,10 +96,7 @@ class QBFilterStatus {
   final String value;
   final String label;
 
-  const QBFilterStatus({
-    required this.value,
-    required this.label,
-  });
+  const QBFilterStatus({required this.value, required this.label});
 
   static const List<QBFilterStatus> allStatuses = [
     QBFilterStatus(value: 'all', label: '全部'),
@@ -113,9 +112,11 @@ class QBFilterStatus {
     QBFilterStatus(value: 'stalled', label: '停滞'),
     QBFilterStatus(value: 'stalled_uploading', label: '上传停滞'),
     QBFilterStatus(value: 'stalled_download', label: '下载停滞'),
+    QBFilterStatus(value: 'queued_upload', label: '排队上传'),
+    QBFilterStatus(value: 'queued_download', label: '排队下载'),
     QBFilterStatus(value: 'checking', label: '检查中'),
+    QBFilterStatus(value: 'allocating', label: '分配空间'),
     QBFilterStatus(value: 'moving', label: '移动中'),
     QBFilterStatus(value: 'errored', label: '错误'),
   ];
 }
-

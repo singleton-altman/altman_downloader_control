@@ -417,14 +417,6 @@ class _QBFilterWidgetInternalState extends State<_QBFilterWidgetInternal> {
     );
   }
 
-  void _clearFilter() {
-    selectedStatuses.clear();
-    selectedCategories.clear();
-    selectedTags.clear();
-    selectedTrackers.clear();
-    widget.controller.clearFilter();
-  }
-
   Widget _buildFlatSection({
     required BuildContext context,
     required String title,
@@ -766,112 +758,17 @@ class _QBFilterWidgetInternalState extends State<_QBFilterWidgetInternal> {
       return torrents.length;
     }
 
-    return torrents.where((torrent) {
-      switch (status.toLowerCase()) {
-        case 'downloading':
-          return torrent.isDownloading;
-        case 'seeding':
-          return torrent.isSeeding;
-        case 'completed':
-          return torrent.isCompleted;
-        case 'resumed':
-          return torrent.isResumed;
-        case 'running':
-          return torrent.isDownloading || torrent.isSeeding;
-        case 'stopped':
-          return torrent.isStopped;
-        case 'active':
-          return torrent.isActive;
-        case 'inactive':
-          return torrent.isInactive;
-        case 'stalled':
-          return torrent.isStalled;
-        case 'stalled_uploading':
-        case 'stalled uploading':
-          return torrent.isStalled && torrent.isSeeding;
-        case 'stalled_download':
-        case 'stalled download':
-          return torrent.isStalled && torrent.isDownloading;
-        case 'checking':
-          return torrent.isChecking;
-        case 'moving':
-          return torrent.isMoving;
-        case 'errored':
-        case 'error':
-          return torrent.hasError;
-        case 'paused':
-          return torrent.isPaused;
-        default:
-          return false;
-      }
-    }).length;
+    return torrents
+        .where((torrent) => torrent.matchesFilterStatus(status))
+        .length;
   }
 
   /// 计算指定状态的种子总尺寸
   int _getStatusSize(String status) {
     int totalSize = 0;
     for (var torrent in widget.controller.torrents) {
-      bool matchesStatus = false;
-
-      switch (status.toLowerCase()) {
-        case 'all':
-          matchesStatus = true;
-          break;
-        case 'downloading':
-          matchesStatus = torrent.isDownloading;
-          break;
-        case 'seeding':
-          matchesStatus = torrent.isSeeding;
-          break;
-        case 'completed':
-          matchesStatus = torrent.isCompleted;
-          break;
-        case 'resumed':
-          matchesStatus = torrent.isResumed;
-          break;
-        case 'running':
-          matchesStatus = torrent.isDownloading || torrent.isSeeding;
-          break;
-        case 'stopped':
-          matchesStatus = torrent.isStopped;
-          break;
-        case 'active':
-          matchesStatus = torrent.isActive;
-          break;
-        case 'inactive':
-          matchesStatus = torrent.isInactive;
-          break;
-        case 'stalled':
-          matchesStatus = torrent.isStalled;
-          break;
-        case 'stalled_uploading':
-        case 'stalled uploading':
-          matchesStatus = torrent.isStalled && torrent.isSeeding;
-          break;
-        case 'stalled_download':
-        case 'stalled download':
-          matchesStatus = torrent.isStalled && torrent.isDownloading;
-          break;
-        case 'checking':
-          matchesStatus = torrent.isChecking;
-          break;
-        case 'moving':
-          matchesStatus = torrent.isMoving;
-          break;
-        case 'errored':
-        case 'error':
-          matchesStatus = torrent.hasError;
-          break;
-        case 'paused':
-          matchesStatus = torrent.isPaused;
-          break;
-        default:
-          matchesStatus = false;
-      }
-
-      if (matchesStatus) {
-        totalSize += torrent.totalSize > 0 ? torrent.totalSize : torrent.size;
-      }
+      if (!torrent.matchesFilterStatus(status)) continue;
+      totalSize += torrent.totalSize > 0 ? torrent.totalSize : torrent.size;
     }
     return totalSize;
   }
@@ -941,10 +838,7 @@ class _QBFilterWidgetInternalState extends State<_QBFilterWidgetInternal> {
   }
 }
 
-Future<void> showQBFilterDraggableSheet(
-  BuildContext context,
-  QBController qb,
-) {
+Future<void> showQBFilterDraggableSheet(BuildContext context, QBController qb) {
   return showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
@@ -1024,9 +918,7 @@ Future<void> showQBFilterDraggableSheet(
                     ),
                   ),
                   QBFilterWidget(controller: qb, embeddedInSheet: true),
-                  SliverToBoxAdapter(
-                    child: SizedBox(height: bottomInset + 8),
-                  ),
+                  SliverToBoxAdapter(child: SizedBox(height: bottomInset + 8)),
                 ],
               ),
             ),

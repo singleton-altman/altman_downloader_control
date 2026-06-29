@@ -388,7 +388,7 @@ class _QBPreferencesSettingsScreenState
             controller: _tempPathController,
             enabled: _tempPathEnabled,
             headerTrailing: CupertinoSwitch(
-              activeColor: Get.theme.colorScheme.primary,
+              activeTrackColor: Get.theme.colorScheme.primary,
               value: _tempPathEnabled,
               onChanged: (value) {
                 setState(() {
@@ -562,9 +562,7 @@ class _QBPreferencesSettingsScreenState
           ),
           LabelTextFieldForm(
             title: 'Web API 密钥',
-            tip: _preferences!.webUiApiKey.isEmpty
-                ? '可选'
-                : '已配置密钥；填入新值将覆盖',
+            tip: _preferences!.webUiApiKey.isEmpty ? '可选' : '已配置密钥；填入新值将覆盖',
             controller: _webUiApiKeyController,
             obscureText: true,
           ),

@@ -28,8 +28,6 @@ class DownloaderConfig {
       case DownloaderType.transmission: // Transmission
         // Transmission 可能不需要用户名密码，或者需要其他验证
         return true;
-      default:
-        return username.isNotEmpty && password.isNotEmpty;
     }
   }
 

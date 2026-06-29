@@ -1,3 +1,5 @@
+// ignore_for_file: invalid_annotation_target
+
 import 'package:freezed_annotation/freezed_annotation.dart';
 
 part 'qb_preferences_model.freezed.dart';
@@ -156,9 +158,7 @@ class QBPreferencesModel with _$QBPreferencesModel {
     String fileLogPath,
     @JsonKey(name: 'file_pool_size') @Default(100) int filePoolSize,
     @JsonKey(name: 'hashing_threads') @Default(1) int hashingThreads,
-    @JsonKey(name: 'hostname_cache_ttl')
-    @Default(1200)
-    int hostnameCacheTtl,
+    @JsonKey(name: 'hostname_cache_ttl') @Default(1200) int hostnameCacheTtl,
     @JsonKey(name: 'i2p_address') @Default('127.0.0.1') String i2pAddress,
     @JsonKey(name: 'i2p_enabled') @Default(false) bool i2pEnabled,
     @JsonKey(name: 'i2p_inbound_length') @Default(3) int i2pInboundLength,

@@ -277,7 +277,7 @@ class QBService {
 
   /// 获取分类列表
   /// API: GET /api/v2/torrents/categories
-  /// 返回 Map<String, dynamic>，key 为分类名称，value 为分类信息（包含 savePath）
+  /// 返回分类名称到分类信息的映射，分类信息包含 savePath。
   Future<Map<String, dynamic>> getCategories() async {
     if (!_initialized) {
       throw Exception('API not initialized');
@@ -1073,7 +1073,7 @@ class QBService {
         try {
           final o = jsonDecode(t);
           if (o is Map) {
-            return Map<String, dynamic>.from(o as Map);
+            return Map<String, dynamic>.from(o);
           }
         } catch (_) {}
       }

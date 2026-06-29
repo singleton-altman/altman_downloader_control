@@ -16,7 +16,7 @@ extension QBPreferencesModelExtension on QBPreferencesModel {
 
 extension IntExtension on int {
   String toHumanReadableFileSize({int round = 0}) {
-    return this.toDouble().toHumanReadableFileSize(round: round);
+    return toDouble().toHumanReadableFileSize(round: round);
   }
 }
 

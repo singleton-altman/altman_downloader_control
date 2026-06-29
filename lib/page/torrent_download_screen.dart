@@ -767,9 +767,7 @@ class _TorrentDownloadScreenState extends State<TorrentDownloadScreen> {
           onPressed: _onDownload,
           child: const Text(
             '下载',
-            style: TextStyle(              fontSize: 16,
-              fontWeight: FontWeight.w600,
-            ),
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
           ),
         );
       }),
@@ -809,7 +807,7 @@ class LocalTorrentFilesPage extends StatelessWidget {
             ),
           );
         },
-        separatorBuilder: (_, __) => const SizedBox(height: 10),
+        separatorBuilder: (_, _) => const SizedBox(height: 10),
         itemCount: filePaths.length,
       ),
     );

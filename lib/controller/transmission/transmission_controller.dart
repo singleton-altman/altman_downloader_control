@@ -367,7 +367,7 @@ class TransmissionController extends GetxController
     }
 
     _log.d(
-      'Transmission: Buffer 处理完成，更新 ${updateCount} 条，移除 ${hashesToRemove.length} 条',
+      'Transmission: Buffer 处理完成，更新 $updateCount 条，移除 ${hashesToRemove.length} 条',
     );
   }
 

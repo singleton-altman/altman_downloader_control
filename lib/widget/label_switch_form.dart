@@ -61,7 +61,7 @@ class LabelSwitchForm extends FormField<bool> {
                  Spacer(),
                  CupertinoSwitch(
                    value: state.value ?? false,
-                   activeColor: Get.theme.colorScheme.primary,
+                   activeTrackColor: Get.theme.colorScheme.primary,
                    onChanged: state.widget.enabled
                        ? (v) {
                            state.didChange(v);

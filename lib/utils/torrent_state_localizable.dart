@@ -34,6 +34,7 @@ class QBLocalizable {
   static const String queuedDownload = '排队下载';
   static const String queuedUpload = '排队上传';
   static const String moving = '移动中';
+  static const String allocating = '分配空间';
   static const String error = '错误';
   static const String missingFiles = '文件缺失';
 
@@ -64,12 +65,17 @@ class QBLocalizable {
       case 'paused_upload':
         return pausedUpload;
       case 'forced_download':
+      case 'forceddl':
         return forcedDownload;
       case 'forced_upload':
+      case 'forcedup':
         return forcedUpload;
       case 'meta_download':
+      case 'metadl':
         return metaDownload;
       case 'forced_meta_download':
+      case 'forcedmetadl':
+      case 'forcedmetadata':
         return forcedMetaDownload;
       case 'stalled_download':
       case 'stalleddl':
@@ -78,17 +84,24 @@ class QBLocalizable {
       case 'stalledup':
         return stalledUpload;
       case 'checking_download':
+      case 'checkingdl':
         return checkingDownload;
       case 'checking_upload':
+      case 'checkingup':
         return checkingUpload;
       case 'checking_resume_data':
+      case 'checkingresumedata':
         return checkingResumeData;
       case 'queued_download':
+      case 'queueddl':
         return queuedDownload;
       case 'queued_upload':
+      case 'queuedup':
         return queuedUpload;
       case 'moving':
         return moving;
+      case 'allocating':
+        return allocating;
       case 'error':
         return error;
       case 'missing_files':
@@ -106,8 +119,6 @@ class QBLocalizable {
         return pausedUpload;
       case 'pauseddl':
         return pausedDownload;
-      case 'forcedup':
-        return forcedUpload;
     }
     return state;
   }

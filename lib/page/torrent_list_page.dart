@@ -121,7 +121,11 @@ class _DownloaderTorrentListPageState extends State<DownloaderTorrentListPage> {
     return ascending ? compare : -compare;
   }
 
-  int _compareAddedOn(TorrentModel a, TorrentModel b, {required bool ascending}) {
+  int _compareAddedOn(
+    TorrentModel a,
+    TorrentModel b, {
+    required bool ascending,
+  }) {
     final aVal = a.addedOn;
     final bVal = b.addedOn;
     final aValid = aVal > 0;
@@ -138,7 +142,9 @@ class _DownloaderTorrentListPageState extends State<DownloaderTorrentListPage> {
       final sortType = qbController.torrentSortType.value;
       final ascending = _isQbSortAscending(sortType);
       final list = qbController.filter.value.hasFilters
-          ? qbController.filteredTorrents.map((t) => t.toTorrentModel()).toList()
+          ? qbController.filteredTorrents
+                .map((t) => t.toTorrentModel())
+                .toList()
           : List<TorrentModel>.from(qbController.torrentsUniversal);
       _sortQbList(list, sortType, ascending: ascending);
       return list;
@@ -184,7 +190,8 @@ class _DownloaderTorrentListPageState extends State<DownloaderTorrentListPage> {
         break;
       case QBTorrentSortType.size:
         list.sort(
-          (a, b) => _withDirection(a.size.compareTo(b.size), ascending: ascending),
+          (a, b) =>
+              _withDirection(a.size.compareTo(b.size), ascending: ascending),
         );
         break;
       case QBTorrentSortType.progress:
@@ -223,7 +230,8 @@ class _DownloaderTorrentListPageState extends State<DownloaderTorrentListPage> {
         break;
       case QBTorrentSortType.ratio:
         list.sort(
-          (a, b) => _withDirection(a.ratio.compareTo(b.ratio), ascending: ascending),
+          (a, b) =>
+              _withDirection(a.ratio.compareTo(b.ratio), ascending: ascending),
         );
         break;
     }
@@ -279,7 +287,8 @@ class _DownloaderTorrentListPageState extends State<DownloaderTorrentListPage> {
         break;
       case TransmissionTorrentSortType.ratio:
         list.sort(
-          (a, b) => _withDirection(a.ratio.compareTo(b.ratio), ascending: ascending),
+          (a, b) =>
+              _withDirection(a.ratio.compareTo(b.ratio), ascending: ascending),
         );
         break;
     }
@@ -738,10 +747,7 @@ class _DownloaderTorrentListPageState extends State<DownloaderTorrentListPage> {
 
           return Row(
             children: [
-              _buildSelectionExitFab(
-                context,
-                size: exitButtonSize,
-              ),
+              _buildSelectionExitFab(context, size: exitButtonSize),
               const SizedBox(width: 8),
               Expanded(
                 child: ClipRRect(
@@ -840,8 +846,8 @@ class _DownloaderTorrentListPageState extends State<DownloaderTorrentListPage> {
         icon: Icon(o.icon, size: 20, color: iconColor),
         onPressed: o.enabled
             ? () async {
-              await o.action();
-            }
+                await o.action();
+              }
             : null,
       ),
     );
@@ -889,10 +895,7 @@ class _DownloaderTorrentListPageState extends State<DownloaderTorrentListPage> {
                         color: _selectionBarIconColor(menuScheme, o),
                       ),
                       const SizedBox(width: 12),
-                      Text(
-                        o.label,
-                        style: Theme.of(ctx).textTheme.bodyMedium,
-                      ),
+                      Text(o.label, style: Theme.of(ctx).textTheme.bodyMedium),
                     ],
                   ),
                 ),
@@ -1097,7 +1100,7 @@ class _DownloaderTorrentListPageState extends State<DownloaderTorrentListPage> {
       final normalColor = Theme.of(context).colorScheme.onSurfaceVariant;
       return CupertinoButton(
         padding: EdgeInsets.zero,
-        minSize: 0,
+        minimumSize: Size.zero,
         onPressed: () => _openFloatingFilterSheet(context),
         child: Icon(
           CupertinoIcons.slider_horizontal_3,
@@ -1906,7 +1909,9 @@ class _DownloaderTorrentListPageState extends State<DownloaderTorrentListPage> {
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(
-              ascending ? Icons.arrow_upward_rounded : Icons.arrow_downward_rounded,
+              ascending
+                  ? Icons.arrow_upward_rounded
+                  : Icons.arrow_downward_rounded,
               size: 14,
               color: theme.colorScheme.primary,
             ),
@@ -2092,7 +2097,9 @@ class _DownloaderTorrentListPageState extends State<DownloaderTorrentListPage> {
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(
-              ascending ? Icons.arrow_upward_rounded : Icons.arrow_downward_rounded,
+              ascending
+                  ? Icons.arrow_upward_rounded
+                  : Icons.arrow_downward_rounded,
               size: 14,
               color: theme.colorScheme.primary,
             ),
@@ -2178,7 +2185,9 @@ class _DownloaderTorrentListPageState extends State<DownloaderTorrentListPage> {
                 : Icons.select_all_rounded,
             label: allOn ? '取消全选' : '全选',
             emphasized: allOn,
-            onTap: visible.isEmpty ? null : () => _toggleSelectAllVisible(visible),
+            onTap: visible.isEmpty
+                ? null
+                : () => _toggleSelectAllVisible(visible),
           ),
         ),
         const SizedBox(width: 4),
@@ -2205,9 +2214,7 @@ class _DownloaderTorrentListPageState extends State<DownloaderTorrentListPage> {
         : colorScheme.outlineVariant.withValues(alpha: 0.28);
 
     return Material(
-      color: onTap == null
-          ? background.withValues(alpha: 0.45)
-          : background,
+      color: onTap == null ? background.withValues(alpha: 0.45) : background,
       borderRadius: BorderRadius.circular(999),
       child: InkWell(
         onTap: onTap,

@@ -1449,74 +1449,10 @@ class QBController extends GetxController
         bool matchesStatus = false;
 
         for (var status in currentFilter.selectedStatuses) {
-          switch (status.toLowerCase()) {
-            case 'all':
-              matchesStatus = true;
-              break;
-            case 'downloading':
-              // 下载状态：downloading, checkingDL, stalledDL, forcedDL, queuedDL, metaDL, forcedMetaDL, pausedDL
-              matchesStatus = torrent.isDownloading;
-              break;
-            case 'seeding':
-              // 做种状态：uploading, checkingUP, stalledUP, forcedUP, queuedUP
-              matchesStatus = torrent.isSeeding;
-              break;
-            case 'completed':
-              // 已完成状态：seedingStates + pausedUP
-              matchesStatus = torrent.isCompleted;
-              break;
-            case 'resumed':
-              // 恢复状态：各种运行中的状态（不包括 paused）
-              matchesStatus = torrent.isResumed;
-              break;
-            case 'running':
-              // 运行中：下载或做种状态
-              matchesStatus = torrent.isDownloading || torrent.isSeeding;
-              break;
-            case 'stopped':
-              matchesStatus = torrent.isStopped;
-              break;
-            case 'active':
-              // 活跃：有下载或上传速度
-              matchesStatus = torrent.isActive;
-              break;
-            case 'inactive':
-              // 非活跃：没有下载和上传速度
-              matchesStatus = torrent.isInactive;
-              break;
-            case 'stalled':
-              // 停滞状态：stalledDL, stalledUP
-              matchesStatus = torrent.isStalled;
-              break;
-            case 'stalled_uploading':
-            case 'stalled uploading':
-              matchesStatus = torrent.isStalled && torrent.isSeeding;
-              break;
-            case 'stalled_download':
-            case 'stalled download':
-              matchesStatus = torrent.isStalled && torrent.isDownloading;
-              break;
-            case 'checking':
-              // 检查状态：checkingDL, checkingUP, checkingResumeData
-              matchesStatus = torrent.isChecking;
-              break;
-            case 'moving':
-              matchesStatus = torrent.isMoving;
-              break;
-            case 'errored':
-            case 'error':
-            case 'missingfiles':
-            case 'missing_files':
-              // 错误状态：error, missingFiles
-              matchesStatus = torrent.hasError;
-              break;
-            case 'paused':
-              // 暂停状态：pausedDL, pausedUP
-              matchesStatus = torrent.isPaused;
-              break;
+          if (torrent.matchesFilterStatus(status)) {
+            matchesStatus = true;
+            break;
           }
-
-          if (matchesStatus) break;
         }
 
         if (!matchesStatus) return false;

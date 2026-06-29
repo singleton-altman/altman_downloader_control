@@ -543,6 +543,7 @@ class _QBRssListPageState extends State<QBRssListPage> {
                   showToast(message: '标记已读失败: $e');
                 }
               }
+              if (!mounted) return;
               // 显示详情页面
               showQBRssItemDetailSheet(
                 context,

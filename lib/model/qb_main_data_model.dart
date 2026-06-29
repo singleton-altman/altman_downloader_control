@@ -68,7 +68,9 @@ class QBMainDataModel {
         serverState = QBServerState.fromJson(
           json['server_state'] as Map<String, dynamic>,
         );
-      } catch (e) {}
+      } catch (_) {
+        serverState = null;
+      }
     }
 
     return QBMainDataModel(

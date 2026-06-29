@@ -195,8 +195,10 @@ class QBTorrentModel {
     'queued_download',
     'metadl',
     'meta_download',
+    'forcedmetadl',
     'forcedmetadata',
     'forced_meta_download',
+    'allocating',
     'pauseddl',
     'paused_download',
   };
@@ -227,12 +229,16 @@ class QBTorrentModel {
     'checking_download',
     'stalleddl',
     'stalled_download',
+    'forceddl',
+    'forced_download',
     'queueddl',
     'queued_download',
     'metadl',
     'meta_download',
+    'forcedmetadl',
     'forcedmetadata',
     'forced_meta_download',
+    'allocating',
     'uploading',
     'seeding',
     'checkingup',
@@ -255,6 +261,19 @@ class QBTorrentModel {
     'paused',
   };
 
+  /// 排队上传状态集合
+  static final Set<String> _queuedUploadStates = {
+    'queuedup',
+    'queued_upload',
+    'queued_to_seed',
+  };
+
+  /// 排队下载状态集合
+  static final Set<String> _queuedDownloadStates = {
+    'queueddl',
+    'queued_download',
+  };
+
   /// 停滞状态集合
   static final Set<String> _stalledStates = {
     'stalleddl',
@@ -272,6 +291,15 @@ class QBTorrentModel {
     'checkingresumedata',
     'checking_resume_data',
     'checking',
+  };
+
+  /// 已停止状态集合
+  static final Set<String> _stoppedStates = {
+    'stopped',
+    'stoppeddl',
+    'stoppedup',
+    'stopped_dl',
+    'stopped_up',
   };
 
   /// 错误状态集合
@@ -299,6 +327,12 @@ class QBTorrentModel {
   /// 是否已暂停
   bool get isPaused => _pausedStates.contains(_stateLower);
 
+  /// 是否排队上传（queuedUP）
+  bool get isQueuedUpload => _queuedUploadStates.contains(_stateLower);
+
+  /// 是否排队下载（queuedDL）
+  bool get isQueuedDownload => _queuedDownloadStates.contains(_stateLower);
+
   /// 是否停滞
   bool get isStalled => _stalledStates.contains(_stateLower);
 
@@ -311,14 +345,72 @@ class QBTorrentModel {
   /// 是否在移动
   bool get isMoving => _stateLower == 'moving';
 
-  /// 是否已停止（显式停止状态）
-  bool get isStopped => _stateLower == 'stopped';
+  /// 是否已停止
+  bool get isStopped => _stoppedStates.contains(_stateLower);
 
   /// 是否活跃（有下载或上传速度）
   bool get isActive => dlspeed > 0 || upspeed > 0;
 
   /// 是否非活跃（没有下载和上传速度）
   bool get isInactive => dlspeed == 0 && upspeed == 0;
+
+  /// 是否在分配磁盘空间
+  bool get isAllocating => _stateLower == 'allocating';
+
+  /// 是否匹配筛选状态
+  bool matchesFilterStatus(String status) {
+    switch (status.toLowerCase()) {
+      case 'all':
+        return true;
+      case 'downloading':
+        return isDownloading;
+      case 'seeding':
+        return isSeeding;
+      case 'completed':
+        return isCompleted;
+      case 'resumed':
+        return isResumed;
+      case 'running':
+        return isDownloading || isSeeding;
+      case 'stopped':
+        return isStopped;
+      case 'active':
+        return isActive;
+      case 'inactive':
+        return isInactive;
+      case 'stalled':
+        return isStalled;
+      case 'stalled_uploading':
+      case 'stalled uploading':
+        return isStalled && isSeeding;
+      case 'stalled_download':
+      case 'stalled download':
+        return isStalled && isDownloading;
+      case 'queued_upload':
+      case 'queued uploading':
+      case 'queuedup':
+        return isQueuedUpload;
+      case 'queued_download':
+      case 'queued downloading':
+      case 'queueddl':
+        return isQueuedDownload;
+      case 'checking':
+        return isChecking;
+      case 'moving':
+        return isMoving;
+      case 'allocating':
+        return isAllocating;
+      case 'errored':
+      case 'error':
+      case 'missingfiles':
+      case 'missing_files':
+        return hasError;
+      case 'paused':
+        return isPaused;
+      default:
+        return _stateLower == status.toLowerCase();
+    }
+  }
 
   /// 从通用 TorrentModel 转换
   factory QBTorrentModel.fromTorrentModel(TorrentModel torrent) {
