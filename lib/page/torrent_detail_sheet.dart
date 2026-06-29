@@ -1,3 +1,5 @@
+import 'dart:ui';
+
 import 'package:altman_downloader_control/controller/qbittorrent/qb_controller.dart';
 import 'package:altman_downloader_control/model/qb_torrent_file_model.dart';
 import 'package:altman_downloader_control/model/qb_torrent_model.dart';
@@ -6,7 +8,6 @@ import 'package:altman_downloader_control/model/qb_tracker_model.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:get/get.dart';
 
 import '../utils/string_utils.dart';
 import '../utils/toast_utils.dart';
@@ -54,9 +55,18 @@ class _QbTorrentDetailSheetState extends State<QbTorrentDetailSheet> {
   bool _isLoadingFiles = false;
   String? _errorMessage;
 
-  // Segment control 状态
-  final _selectedSegment = 'general'.obs;
-  final _generalSubSegment = 'overview'.obs;
+  int _mainPanel = 0;
+  String _detailSegment = 'overview';
+
+  static const _floatingTabBarHeight = 56.0;
+  static const _sheetPageHorizontalPadding = 16.0;
+  static const _sheetPageRadius = 18.0;
+
+  static const _mainPanelDefs = [
+    (icon: CupertinoIcons.square_list, label: '详情'),
+    (icon: CupertinoIcons.antenna_radiowaves_left_right, label: 'Tracker'),
+    (icon: CupertinoIcons.doc_on_doc, label: '文件'),
+  ];
 
   @override
   void initState() {
@@ -64,6 +74,16 @@ class _QbTorrentDetailSheetState extends State<QbTorrentDetailSheet> {
     _loadProperties();
     _loadTrackers();
     _loadFiles();
+  }
+
+  void _selectMainPanel(int index) {
+    if (_mainPanel == index) return;
+    setState(() => _mainPanel = index);
+  }
+
+  void _selectDetailSegment(String segment) {
+    if (_detailSegment == segment) return;
+    setState(() => _detailSegment = segment);
   }
 
   Future<void> _loadProperties() async {
@@ -144,6 +164,8 @@ class _QbTorrentDetailSheetState extends State<QbTorrentDetailSheet> {
       minChildSize: 0.5,
       maxChildSize: 0.99,
       builder: (context, scrollController) {
+        final bottomSafe = MediaQuery.paddingOf(context).bottom;
+        final contentBottomPad = bottomSafe + _floatingTabBarHeight + 24;
         return Container(
           decoration: BoxDecoration(
             color: Theme.of(context).colorScheme.surface,
@@ -164,132 +186,21 @@ class _QbTorrentDetailSheetState extends State<QbTorrentDetailSheet> {
               ),
             ],
           ),
-          child: Column(
+          child: Stack(
             children: [
-              _buildSheetDragHandle(context),
-              _buildSheetTopBar(context),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-                child: Obx(() {
-                  final selectedValue = _selectedSegment.value;
-                  final cs = Theme.of(context).colorScheme;
-                  return DecoratedBox(
-                    decoration: BoxDecoration(
-                      color: cs.surfaceContainerHighest.withValues(alpha: 0.45),
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(
-                        color: cs.outlineVariant.withValues(alpha: 0.22),
-                      ),
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.all(3),
-                      child: CupertinoSlidingSegmentedControl<String>(
-                        groupValue: selectedValue,
-                        thumbColor: cs.surface,
-                        backgroundColor: Colors.transparent,
-                        children: {
-                          'general': _buildSegmentLabel(context, '基本'),
-                          'tracker': _buildSegmentLabel(context, 'Tracker'),
-                          'content': _buildSegmentLabel(context, '文件'),
-                        },
-                        onValueChanged: (value) {
-                          if (value != null) {
-                            _selectedSegment.value = value;
-                          }
-                        },
-                      ),
-                    ),
-                  );
-                }),
+              Column(
+                children: [
+                  _buildSheetDragHandle(context),
+                  Expanded(
+                    child: _buildBody(scrollController, contentBottomPad),
+                  ),
+                ],
               ),
-              // 内容区域
-              Expanded(
-                child: _isLoading
-                    ? Center(
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            CircularProgressIndicator(
-                              color: Theme.of(context).colorScheme.primary,
-                              strokeWidth: 2.5,
-                            ),
-                            const SizedBox(height: 18),
-                            Text(
-                              '加载详情…',
-                              style: Theme.of(context).textTheme.bodyMedium
-                                  ?.copyWith(
-                                    color: Theme.of(
-                                      context,
-                                    ).colorScheme.onSurfaceVariant,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                            ),
-                          ],
-                        ),
-                      )
-                    : _errorMessage != null
-                    ? Center(
-                        child: Padding(
-                          padding: const EdgeInsets.all(24),
-                          child: Container(
-                            padding: const EdgeInsets.all(22),
-                            decoration: BoxDecoration(
-                              color: Theme.of(context)
-                                  .colorScheme
-                                  .errorContainer
-                                  .withValues(alpha: 0.35),
-                              borderRadius: BorderRadius.circular(20),
-                              border: Border.all(
-                                color: Theme.of(context)
-                                    .colorScheme
-                                    .outlineVariant
-                                    .withValues(alpha: 0.2),
-                              ),
-                            ),
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  Icons.cloud_off_rounded,
-                                  size: 44,
-                                  color: Theme.of(context).colorScheme.error,
-                                ),
-                                const SizedBox(height: 14),
-                                Text(
-                                  _errorMessage!,
-                                  textAlign: TextAlign.center,
-                                  style: Theme.of(context).textTheme.bodyMedium
-                                      ?.copyWith(
-                                        color: Theme.of(
-                                          context,
-                                        ).colorScheme.onSurface,
-                                        height: 1.35,
-                                      ),
-                                ),
-                                const SizedBox(height: 20),
-                                FilledButton.tonalIcon(
-                                  onPressed: _loadProperties,
-                                  icon: const Icon(Icons.refresh_rounded),
-                                  label: const Text('重试'),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      )
-                    : Obx(() {
-                        // 根据选中的 segment 显示不同内容
-                        switch (_selectedSegment.value) {
-                          case 'general':
-                            return _buildGeneralContent(scrollController);
-                          case 'tracker':
-                            return _buildTrackerContent(scrollController);
-                          case 'content':
-                            return _buildContentContent(scrollController);
-                          default:
-                            return _buildGeneralContent(scrollController);
-                        }
-                      }),
+              Positioned(
+                left: 16,
+                right: 16,
+                bottom: bottomSafe + 12,
+                child: _buildFloatingMainTabBar(context),
               ),
             ],
           ),
@@ -298,24 +209,451 @@ class _QbTorrentDetailSheetState extends State<QbTorrentDetailSheet> {
     );
   }
 
-  Widget _buildSegmentLabel(BuildContext context, String label) {
+  Widget _buildBody(ScrollController scrollController, double bottomPad) {
+    if (_isLoading) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+              _sheetPageHorizontalPadding,
+              0,
+              8,
+              8,
+            ),
+            child: _buildTorrentHeader(context),
+          ),
+          Expanded(
+            child: Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  CircularProgressIndicator(
+                    color: Theme.of(context).colorScheme.primary,
+                    strokeWidth: 2.5,
+                  ),
+                  const SizedBox(height: 18),
+                  Text(
+                    '加载详情…',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+    if (_errorMessage != null) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+              _sheetPageHorizontalPadding,
+              0,
+              8,
+              8,
+            ),
+            child: _buildTorrentHeader(context),
+          ),
+          Expanded(
+            child: Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Container(
+                  padding: const EdgeInsets.all(22),
+                  decoration: BoxDecoration(
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.errorContainer.withValues(alpha: 0.35),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.outlineVariant.withValues(alpha: 0.2),
+                    ),
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.cloud_off_rounded,
+                        size: 44,
+                        color: Theme.of(context).colorScheme.error,
+                      ),
+                      const SizedBox(height: 14),
+                      Text(
+                        _errorMessage!,
+                        textAlign: TextAlign.center,
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: Theme.of(context).colorScheme.onSurface,
+                          height: 1.35,
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      CupertinoButton.filled(
+                        onPressed: _loadProperties,
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              CupertinoIcons.arrow_clockwise,
+                              size: 18,
+                              color: CupertinoColors.white,
+                            ),
+                            SizedBox(width: 6),
+                            Text('重试'),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+    return CustomScrollView(
+      controller: scrollController,
+      slivers: [
+        SliverPadding(
+          padding: const EdgeInsets.fromLTRB(
+            _sheetPageHorizontalPadding,
+            0,
+            4,
+            4,
+          ),
+          sliver: SliverToBoxAdapter(child: _buildTorrentHeader(context)),
+        ),
+        ..._buildPanelSlivers(),
+        SliverPadding(padding: EdgeInsets.only(bottom: bottomPad)),
+      ],
+    );
+  }
+
+  List<Widget> _buildPanelSlivers() {
+    switch (_mainPanel) {
+      case 1:
+        return _buildTrackerSlivers();
+      case 2:
+        return _buildFileSlivers();
+      default:
+        return _buildDetailSlivers();
+    }
+  }
+
+  Widget _buildFloatingMainTabBar(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
-      child: Center(
-        child: Text(
-          label,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          textAlign: TextAlign.center,
-          style: Theme.of(context).textTheme.labelLarge?.copyWith(
-            fontWeight: FontWeight.w600,
-            fontSize: 13,
-            color: scheme.onSurface,
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(999),
+        boxShadow: [
+          BoxShadow(
+            color: scheme.shadow.withValues(alpha: isDark ? 0.45 : 0.14),
+            blurRadius: 24,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(999),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 32, sigmaY: 32),
+          child: Container(
+            height: _floatingTabBarHeight,
+            padding: const EdgeInsets.all(5),
+            decoration: BoxDecoration(
+              color: isDark
+                  ? const Color(0xFF2C2C2E).withValues(alpha: 0.96)
+                  : scheme.surface.withValues(alpha: 0.98),
+              borderRadius: BorderRadius.circular(999),
+              border: Border.all(
+                color: scheme.outlineVariant.withValues(
+                  alpha: isDark ? 0.55 : 0.45,
+                ),
+                width: 0.8,
+              ),
+            ),
+            child: Row(
+              children: List.generate(_mainPanelDefs.length, (index) {
+                final item = _mainPanelDefs[index];
+                final selected = _mainPanel == index;
+                final fg = selected
+                    ? (isDark ? Colors.white : scheme.onPrimary)
+                    : scheme.onSurface.withValues(alpha: 0.72);
+                return Expanded(
+                  child: Semantics(
+                    button: true,
+                    selected: selected,
+                    label: item.label,
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
+                      curve: Curves.easeOut,
+                      decoration: BoxDecoration(
+                        color: selected ? scheme.primary : Colors.transparent,
+                        borderRadius: BorderRadius.circular(999),
+                        boxShadow: selected
+                            ? [
+                                BoxShadow(
+                                  color: scheme.primary.withValues(alpha: 0.35),
+                                  blurRadius: 10,
+                                  offset: const Offset(0, 3),
+                                ),
+                              ]
+                            : null,
+                      ),
+                      child: CupertinoButton(
+                        padding: EdgeInsets.zero,
+                        minimumSize: Size.zero,
+                        borderRadius: BorderRadius.circular(999),
+                        onPressed: () => _selectMainPanel(index),
+                        child: SizedBox(
+                          height: double.infinity,
+                          width: double.infinity,
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(item.icon, size: 18, color: fg),
+                              const SizedBox(height: 2),
+                              Text(
+                                item.label,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: Theme.of(context).textTheme.labelSmall
+                                    ?.copyWith(
+                                      fontWeight: selected
+                                          ? FontWeight.w700
+                                          : FontWeight.w600,
+                                      fontSize: 11,
+                                      height: 1,
+                                      color: fg,
+                                    ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              }),
+            ),
           ),
         ),
       ),
     );
+  }
+
+  Widget _buildDetailSegmentBar(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainerHighest.withValues(
+          alpha: isDark ? 0.42 : 0.65,
+        ),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(3),
+        child: CupertinoSlidingSegmentedControl<String>(
+          groupValue: _detailSegment,
+          thumbColor: scheme.surface,
+          backgroundColor: Colors.transparent,
+          children: {
+            'overview': _segmentLabel(context, '概览'),
+            'transfer': _segmentLabel(context, '传输'),
+            'meta': _segmentLabel(context, '属性'),
+            'time': _segmentLabel(context, '时间'),
+          },
+          onValueChanged: (value) {
+            if (value != null) _selectDetailSegment(value);
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _segmentLabel(BuildContext context, String text) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+      child: Text(
+        text,
+        textAlign: TextAlign.center,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: Theme.of(context).textTheme.labelMedium?.copyWith(
+          fontWeight: FontWeight.w600,
+          fontSize: 12,
+        ),
+      ),
+    );
+  }
+
+  List<Widget> _buildDetailSlivers() {
+    return [
+      SliverPadding(
+        padding: const EdgeInsets.fromLTRB(
+          _sheetPageHorizontalPadding,
+          4,
+          _sheetPageHorizontalPadding,
+          0,
+        ),
+        sliver: SliverToBoxAdapter(
+          child: _buildPanelColumn(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _buildDetailSegmentBar(context),
+                const SizedBox(height: 12),
+                AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 220),
+                  switchInCurve: Curves.easeOutCubic,
+                  switchOutCurve: Curves.easeInCubic,
+                  transitionBuilder: (child, animation) {
+                    return FadeTransition(opacity: animation, child: child);
+                  },
+                  child: KeyedSubtree(
+                    key: ValueKey(_detailSegment),
+                    child: _buildDetailSegmentBody(),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    ];
+  }
+
+  Widget _buildDetailSegmentBody() {
+    final props = _properties;
+    final torrent = widget.torrent;
+    switch (_detailSegment) {
+      case 'transfer':
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _buildMetricSection(
+              title: '流量',
+              subtitle: '累计与会话',
+              items: _transferVolumeMetrics(props, torrent),
+            ),
+            _buildMetricSection(
+              title: '速度',
+              subtitle: '实时与限制',
+              items: _speedMetrics(props, torrent),
+            ),
+            _buildMetricSection(
+              title: '连接',
+              subtitle: '节点与分片',
+              items: _connectionMetrics(props, torrent),
+            ),
+          ],
+        );
+      case 'meta':
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            ..._buildMetaSectionChildren(props, torrent),
+            _buildMagnetRow(),
+          ],
+        );
+      case 'time':
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: _buildTimeSectionChildren(props, torrent),
+        );
+      default:
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _buildLiveSpeedStrip(context),
+            const SizedBox(height: 14),
+            _buildSectionHeader('关键指标'),
+            const SizedBox(height: 10),
+            _buildOverviewMetricWrap(context),
+          ],
+        );
+    }
+  }
+
+  List<Widget> _buildTrackerSlivers() {
+    return [
+      SliverPadding(
+        padding: const EdgeInsets.fromLTRB(
+          _sheetPageHorizontalPadding,
+          4,
+          _sheetPageHorizontalPadding,
+          0,
+        ),
+        sliver: SliverToBoxAdapter(
+          child: _buildPanelColumn(child: _buildTrackersSection()),
+        ),
+      ),
+    ];
+  }
+
+  List<Widget> _buildFileSlivers() {
+    final totalSize = _files.fold<int>(0, (sum, file) => sum + file.size);
+    final doneSize = _files.fold<int>(
+      0,
+      (sum, file) => sum + (file.size * file.progress).round(),
+    );
+    final completeCount = _files.where((file) => file.progress >= 1).length;
+    final skippedCount = _files.where((file) => file.priority == 0).length;
+
+    return [
+      SliverPadding(
+        padding: const EdgeInsets.fromLTRB(
+          _sheetPageHorizontalPadding,
+          4,
+          _sheetPageHorizontalPadding,
+          0,
+        ),
+        sliver: SliverToBoxAdapter(
+          child: _buildPanelColumn(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildSectionHeader('文件列表', subtitle: '${_files.length} 个文件'),
+                const SizedBox(height: 12),
+                if (_isLoadingFiles)
+                  _buildPanelPlaceholder(
+                    icon: Icons.folder_open_rounded,
+                    message: '加载文件列表…',
+                    loading: true,
+                  )
+                else if (_files.isEmpty)
+                  _buildPanelPlaceholder(
+                    icon: Icons.folder_open_rounded,
+                    message: '暂无文件',
+                  )
+                else ...[
+                  _buildFilesSummaryGrid(
+                    totalSize: totalSize,
+                    doneSize: doneSize,
+                    completeCount: completeCount,
+                    skippedCount: skippedCount,
+                  ),
+                  const SizedBox(height: 12),
+                  _buildListGroupCard(
+                    children: [for (final file in _files) _buildFileItem(file)],
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+      ),
+    ];
   }
 
   String _statusText() {
@@ -481,6 +819,197 @@ class _QbTorrentDetailSheetState extends State<QbTorrentDetailSheet> {
     return scheme.primary;
   }
 
+  BoxDecoration _sheetPageDecoration(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return BoxDecoration(
+      color: isDark
+          ? scheme.surfaceContainerLow.withValues(alpha: 0.72)
+          : scheme.surface,
+      borderRadius: BorderRadius.circular(_sheetPageRadius),
+      border: Border.all(
+        color: scheme.outlineVariant.withValues(alpha: isDark ? 0.22 : 0.32),
+        width: 0.6,
+      ),
+      boxShadow: isDark
+          ? null
+          : [
+              BoxShadow(
+                color: scheme.shadow.withValues(alpha: 0.05),
+                blurRadius: 16,
+                offset: const Offset(0, 4),
+              ),
+            ],
+    );
+  }
+
+  Widget _buildSheetPageShell({required Widget child}) {
+    return DecoratedBox(
+      decoration: _sheetPageDecoration(context),
+      child: Padding(padding: const EdgeInsets.all(14), child: child),
+    );
+  }
+
+  Widget _buildPanelColumn({required Widget child}) {
+    return _buildSheetPageShell(child: child);
+  }
+
+  String _headerTitleText(String fullName) {
+    final trimmed = fullName.trim();
+    if (trimmed.isEmpty) return fullName;
+    final first = trimmed.split('.').first.trim();
+    return first.isNotEmpty ? first : trimmed;
+  }
+
+  Widget _buildTorrentHeader(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final accent = _statusAccentColor(scheme);
+    final fullTitle = _properties?.name.isNotEmpty == true
+        ? _properties!.name
+        : widget.name;
+    final title = _headerTitleText(fullTitle);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final subtle = scheme.onSurfaceVariant.withValues(alpha: 0.88);
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Expanded(
+              child: Text(
+                title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                  fontWeight: FontWeight.w600,
+                  height: 1.15,
+                  letterSpacing: -0.2,
+                ),
+              ),
+            ),
+            _buildSheetCloseButton(context),
+          ],
+        ),
+        const SizedBox(height: 4),
+        Row(
+          children: [
+            Container(
+              width: 6,
+              height: 6,
+              decoration: BoxDecoration(color: accent, shape: BoxShape.circle),
+            ),
+            const SizedBox(width: 6),
+            Expanded(
+              child: Text(
+                _statusText(),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                  color: subtle,
+                  fontWeight: FontWeight.w500,
+                  fontSize: 12,
+                  height: 1.1,
+                ),
+              ),
+            ),
+            Text(
+              _progressText(),
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                color: subtle,
+                fontWeight: FontWeight.w600,
+                fontSize: 12,
+                fontFeatures: const [FontFeature.tabularFigures()],
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 6),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(999),
+          child: LinearProgressIndicator(
+            value: _progressValue(),
+            minHeight: 2,
+            backgroundColor: scheme.surfaceContainerHighest.withValues(
+              alpha: isDark ? 0.35 : 0.55,
+            ),
+            valueColor: AlwaysStoppedAnimation<Color>(
+              accent.withValues(alpha: 0.75),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPanelPlaceholder({
+    required IconData icon,
+    required String message,
+    bool loading = false,
+  }) {
+    final scheme = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 28),
+      child: Center(
+        child: Column(
+          children: [
+            if (loading)
+              CircularProgressIndicator(color: scheme.primary, strokeWidth: 2.5)
+            else
+              Icon(
+                icon,
+                size: 40,
+                color: scheme.onSurfaceVariant.withValues(alpha: 0.45),
+              ),
+            const SizedBox(height: 12),
+            Text(
+              message,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: scheme.onSurfaceVariant,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildListGroupCard({required List<Widget> children}) {
+    final visible = children.where((child) {
+      if (child is SizedBox &&
+          child.child == null &&
+          child.width == null &&
+          child.height == null) {
+        return false;
+      }
+      return true;
+    }).toList();
+    if (visible.isEmpty) return const SizedBox.shrink();
+    final scheme = Theme.of(context).colorScheme;
+    return Container(
+      width: double.infinity,
+      decoration: _insetCardDecoration(context, radius: 14),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        children: [
+          for (var i = 0; i < visible.length; i++) ...[
+            if (i > 0)
+              Divider(
+                height: 1,
+                thickness: 0.5,
+                indent: 12,
+                endIndent: 12,
+                color: scheme.outlineVariant.withValues(alpha: 0.3),
+              ),
+            visible[i],
+          ],
+        ],
+      ),
+    );
+  }
+
   BoxDecoration _insetCardDecoration(
     BuildContext context, {
     Color? borderColor,
@@ -516,36 +1045,30 @@ class _QbTorrentDetailSheetState extends State<QbTorrentDetailSheet> {
     );
   }
 
-  Widget _buildSheetTopBar(BuildContext context) {
+  Widget _buildSheetCloseButton(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 0, 8, 8),
-      child: Row(
-        children: [
-          Text(
-            '种子详情',
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.w700,
-              letterSpacing: -0.2,
-            ),
-          ),
-          const Spacer(),
-          IconButton(
-            style: IconButton.styleFrom(
-              backgroundColor: scheme.surfaceContainerHighest.withValues(
-                alpha: 0.85,
-              ),
-              foregroundColor: scheme.onSurface,
-              minimumSize: const Size(44, 44),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(14),
-              ),
-            ),
-            icon: const Icon(Icons.close_rounded, size: 22),
-            onPressed: () => Navigator.of(context).pop(),
-            tooltip: '关闭',
-          ),
-        ],
+    return CupertinoButton(
+      padding: const EdgeInsets.all(10),
+      minimumSize: const Size(44, 44),
+      onPressed: () => Navigator.of(context).pop(),
+      child: Icon(
+        CupertinoIcons.xmark,
+        size: 17,
+        color: scheme.onSurfaceVariant.withValues(alpha: 0.85),
+      ),
+    );
+  }
+
+  Widget _cupertinoCopyButton(VoidCallback onPressed) {
+    final scheme = Theme.of(context).colorScheme;
+    return CupertinoButton(
+      padding: EdgeInsets.zero,
+      minimumSize: Size.zero,
+      onPressed: onPressed,
+      child: Icon(
+        CupertinoIcons.doc_on_doc,
+        size: 17,
+        color: scheme.onSurfaceVariant,
       ),
     );
   }
@@ -610,6 +1133,10 @@ class _QbTorrentDetailSheetState extends State<QbTorrentDetailSheet> {
     );
   }
 
+  Widget _buildSectionHeader(String title, {String? subtitle}) {
+    return _buildBlockTitle(title, subtitle: subtitle);
+  }
+
   Widget _buildDataTable(List<Widget> rows) {
     if (rows.isEmpty) return const SizedBox.shrink();
     final scheme = Theme.of(context).colorScheme;
@@ -667,19 +1194,7 @@ class _QbTorrentDetailSheetState extends State<QbTorrentDetailSheet> {
               ),
             ),
           ),
-          if (onCopy != null)
-            IconButton(
-              visualDensity: VisualDensity.compact,
-              padding: EdgeInsets.zero,
-              constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
-              icon: Icon(
-                Icons.copy_rounded,
-                size: 18,
-                color: scheme.onSurfaceVariant,
-              ),
-              tooltip: '复制',
-              onPressed: onCopy,
-            ),
+          if (onCopy != null) _cupertinoCopyButton(onCopy),
         ],
       ),
     );
@@ -791,482 +1306,593 @@ class _QbTorrentDetailSheetState extends State<QbTorrentDetailSheet> {
     );
   }
 
-  Widget _buildGeneralContent(ScrollController scrollController) {
-    // 优先使用 properties，如果没有则使用列表数据
-    final props = _properties;
-    final torrent = widget.torrent;
+  List<Widget> _buildMetaSectionChildren(
+    QBTorrentPropertiesModel? props,
+    QBTorrentModel? torrent,
+  ) {
+    return [
+      _buildGroupedSection(
+        title: '任务',
+        rows: [
+          _buildGroupedRow('名称', props?.name ?? widget.name),
+          _buildGroupedRow(
+            '哈希',
+            props?.hash ?? widget.hash,
+            monospace: true,
+            onCopy: () {
+              final hash = props?.hash ?? widget.hash;
+              Clipboard.setData(ClipboardData(text: hash));
+              showToast(message: '已复制哈希值');
+            },
+          ),
+          if (props != null && props.infohashV1.isNotEmpty)
+            _buildGroupedRow('Infohash V1', props.infohashV1, monospace: true),
+          if (props != null && props.infohashV2.isNotEmpty)
+            _buildGroupedRow('Infohash V2', props.infohashV2, monospace: true),
+          if (props != null) _buildGroupedRow('私有', _yesNo(props.isPrivate)),
+          if (props != null) _buildGroupedRow('元数据', _yesNo(props.hasMetadata)),
+          if (torrent != null && torrent.category.isNotEmpty)
+            _buildGroupedRow('分类', torrent.category),
+          if (torrent != null && torrent.tags.isNotEmpty)
+            _buildGroupedRow('标签', torrent.tags.join(' · ')),
+          if (props != null && props.createdBy.isNotEmpty)
+            _buildGroupedRow('创建者', props.createdBy),
+          if (props != null && props.comment.isNotEmpty)
+            _buildGroupedRow('注释', props.comment),
+        ],
+      ),
+      _buildGroupedSection(
+        title: '路径',
+        rows: [
+          if (props != null) _buildGroupedRow('保存路径', props.savePath),
+          if (props != null && props.downloadPath.isNotEmpty)
+            _buildGroupedRow('下载路径', props.downloadPath),
+          if (torrent != null && torrent.contentPath.isNotEmpty)
+            _buildGroupedRow('内容路径', torrent.contentPath),
+          if (torrent != null && torrent.rootPath.isNotEmpty)
+            _buildGroupedRow('根路径', torrent.rootPath),
+          if (torrent != null && torrent.tracker.isNotEmpty)
+            _buildGroupedRow('Tracker', torrent.tracker),
+          if (props == null && torrent != null && torrent.savePath.isNotEmpty)
+            _buildGroupedRow('保存路径', torrent.savePath),
+        ],
+      ),
+    ];
+  }
 
-    return SingleChildScrollView(
-      controller: scrollController,
-      padding: const EdgeInsets.fromLTRB(12, 0, 12, 28),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _buildGeneralOverviewCard(context),
-          const SizedBox(height: 14),
-          _buildDataBlock(
-            title: '任务信息',
-            rows: [
-              _buildDataRow('名称', props?.name ?? widget.name, maxLines: 4),
-              _buildDataRow(
-                '哈希',
-                props?.hash ?? widget.hash,
-                monospace: true,
-                onCopy: () {
-                  final hash = props?.hash ?? widget.hash;
-                  Clipboard.setData(ClipboardData(text: hash));
-                  showToast(message: '已复制哈希值');
-                },
-              ),
-              if (props != null && props.infohashV1.isNotEmpty)
-                _buildDataRow('Infohash V1', props.infohashV1, monospace: true),
-              if (props != null && props.infohashV2.isNotEmpty)
-                _buildDataRow('Infohash V2', props.infohashV2, monospace: true),
-              if (props != null)
-                _buildDataRow(
-                  '私有',
-                  _yesNo(props.isPrivate),
-                  alignValueEnd: true,
-                ),
-              if (props != null)
-                _buildDataRow(
-                  '元数据',
-                  _yesNo(props.hasMetadata),
-                  alignValueEnd: true,
-                ),
-              if (torrent != null && torrent.category.isNotEmpty)
-                _buildDataRow('分类', torrent.category, alignValueEnd: true),
-              if (torrent != null && torrent.tags.isNotEmpty)
-                _buildDataRow('标签', torrent.tags.join(' / '), maxLines: 4),
-              if (props != null)
-                _buildDataRow('保存路径', props.savePath, maxLines: 3),
-              if (props != null && props.downloadPath.isNotEmpty)
-                _buildDataRow('下载路径', props.downloadPath, maxLines: 3),
-              if (torrent != null && torrent.contentPath.isNotEmpty)
-                _buildDataRow('内容路径', torrent.contentPath, maxLines: 3),
-              if (torrent != null && torrent.rootPath.isNotEmpty)
-                _buildDataRow('根路径', torrent.rootPath, maxLines: 3),
-              if (torrent != null && torrent.tracker.isNotEmpty)
-                _buildDataRow('当前 Tracker', torrent.tracker, maxLines: 3),
-              if (props == null &&
-                  torrent != null &&
-                  torrent.savePath.isNotEmpty)
-                _buildDataRow('保存路径', torrent.savePath, maxLines: 3),
-              if (props != null && props.createdBy.isNotEmpty)
-                _buildDataRow('创建者', props.createdBy, maxLines: 2),
-              if (props != null && props.comment.isNotEmpty)
-                _buildDataRow('注释', props.comment, maxLines: 6),
-            ],
-          ),
-          _buildMetricsBlock(
-            title: '传输统计',
-            items: [
-              if (props != null)
-                _DetailMetricItem(
-                  label: '已下载',
-                  value: props.totalDownloaded.toHumanReadableFileSize(),
-                  icon: Icons.download_rounded,
-                ),
-              if (props == null && torrent != null)
-                _DetailMetricItem(
-                  label: '已下载',
-                  value: torrent.downloaded.toHumanReadableFileSize(),
-                  icon: Icons.download_rounded,
-                ),
-              if (props != null)
-                _DetailMetricItem(
-                  label: '已上传',
-                  value: props.totalUploaded.toHumanReadableFileSize(),
-                  icon: Icons.upload_rounded,
-                  color: Theme.of(context).colorScheme.secondary,
-                ),
-              if (props == null && torrent != null)
-                _DetailMetricItem(
-                  label: '已上传',
-                  value: torrent.uploaded.toHumanReadableFileSize(),
-                  icon: Icons.upload_rounded,
-                  color: Theme.of(context).colorScheme.secondary,
-                ),
-              if (props != null)
-                _DetailMetricItem(
-                  label: '浪费流量',
-                  value: props.totalWasted.toHumanReadableFileSize(),
-                  icon: Icons.warning_amber_rounded,
-                  color: Theme.of(context).colorScheme.error,
-                ),
-              if (props != null)
-                _DetailMetricItem(
-                  label: '会话下载',
-                  value: props.totalDownloadedSession.toHumanReadableFileSize(),
-                  icon: Icons.download_for_offline_outlined,
-                ),
-              if (props == null && torrent != null)
-                _DetailMetricItem(
-                  label: '会话下载',
-                  value: torrent.downloadedSession.toHumanReadableFileSize(),
-                  icon: Icons.download_for_offline_outlined,
-                ),
-              if (props != null)
-                _DetailMetricItem(
-                  label: '会话上传',
-                  value: props.totalUploadedSession.toHumanReadableFileSize(),
-                  icon: Icons.publish_rounded,
-                  color: Theme.of(context).colorScheme.secondary,
-                ),
-              if (props == null && torrent != null)
-                _DetailMetricItem(
-                  label: '会话上传',
-                  value: torrent.uploadedSession.toHumanReadableFileSize(),
-                  icon: Icons.publish_rounded,
-                  color: Theme.of(context).colorScheme.secondary,
-                ),
-            ],
-          ),
-          _buildMetricsBlock(
-            title: '速度与限制',
-            items: [
-              _DetailMetricItem(
-                label: '当前下载',
-                value: _downloadSpeedText(),
-                icon: Icons.south_rounded,
-              ),
-              _DetailMetricItem(
-                label: '当前上传',
-                value: _uploadSpeedText(),
-                icon: Icons.north_rounded,
-              ),
-              if (props != null)
-                _DetailMetricItem(
-                  label: '平均下载',
-                  value: props.dlSpeedAvg > 0
-                      ? '${props.dlSpeedAvg.toHumanReadableFileSize(round: 1)}/s'
-                      : '0 B/s',
-                  icon: Icons.trending_down_rounded,
-                ),
-              if (props != null)
-                _DetailMetricItem(
-                  label: '平均上传',
-                  value: props.upSpeedAvg > 0
-                      ? '${props.upSpeedAvg.toInt().toHumanReadableFileSize(round: 1)}/s'
-                      : '0 B/s',
-                  icon: Icons.trending_up_rounded,
-                ),
-              if (props != null)
-                _DetailMetricItem(
-                  label: '下载限制',
-                  value: _limitText(props.dlLimit),
-                  icon: Icons.speed_rounded,
-                ),
-              if (props == null && torrent != null)
-                _DetailMetricItem(
-                  label: '下载限制',
-                  value: _limitText(torrent.dlLimit),
-                  icon: Icons.speed_rounded,
-                ),
-              if (props != null)
-                _DetailMetricItem(
-                  label: '上传限制',
-                  value: _limitText(props.upLimit),
-                  icon: Icons.speed_rounded,
-                  color: Theme.of(context).colorScheme.secondary,
-                ),
-              if (props == null && torrent != null)
-                _DetailMetricItem(
-                  label: '上传限制',
-                  value: _limitText(torrent.upLimit),
-                  icon: Icons.speed_rounded,
-                  color: Theme.of(context).colorScheme.secondary,
-                ),
-            ],
-          ),
-          _buildMetricsBlock(
-            title: '连接与做种',
-            items: [
-              if (props != null)
-                _DetailMetricItem(
-                  label: '当前连接',
-                  value: '${props.nbConnections}/${props.nbConnectionsLimit}',
-                  icon: Icons.link_rounded,
-                ),
-              if (props != null)
-                _DetailMetricItem(
-                  label: '做种数',
-                  value: '${props.seeds}/${props.seedsTotal}',
-                  icon: Icons.cloud_upload_rounded,
-                ),
-              if (props != null)
-                _DetailMetricItem(
-                  label: '下载数',
-                  value: '${props.peers}/${props.peersTotal}',
-                  icon: Icons.cloud_download_rounded,
-                ),
-              if (props != null)
-                _DetailMetricItem(
-                  label: '分享率',
-                  value: props.shareRatio.toStringAsFixed(4),
-                  icon: Icons.swap_horiz_rounded,
-                ),
-              if (props != null)
-                _DetailMetricItem(
-                  label: '流行度',
-                  value: props.popularity.toStringAsFixed(4),
-                  icon: Icons.local_fire_department_outlined,
-                ),
-              if (props != null)
-                _DetailMetricItem(
-                  label: '分片',
-                  value: '${props.piecesHave}/${props.piecesNum}',
-                  icon: Icons.grid_view_rounded,
-                ),
-              if (props != null)
-                _DetailMetricItem(
-                  label: '分片大小',
-                  value: props.pieceSize.toHumanReadableFileSize(),
-                  icon: Icons.dashboard_customize_outlined,
-                ),
-              if (torrent != null && torrent.hasAvailabilityField)
-                _DetailMetricItem(
-                  label: '可用性',
-                  value: _availabilityText(torrent.availability),
-                  icon: Icons.cloud_done_outlined,
-                  color: Theme.of(context).colorScheme.secondary,
-                ),
-              if (props == null && torrent != null)
-                _DetailMetricItem(
-                  label: '做种数',
-                  value:
-                      '${torrent.numComplete}/${torrent.numComplete + torrent.numIncomplete}',
-                  icon: Icons.cloud_upload_rounded,
-                ),
-              if (props == null && torrent != null)
-                _DetailMetricItem(
-                  label: '下载数',
-                  value:
-                      '${torrent.numIncomplete}/${torrent.numComplete + torrent.numIncomplete}',
-                  icon: Icons.cloud_download_rounded,
-                ),
-              if (props == null && torrent != null)
-                _DetailMetricItem(
-                  label: '分享率',
-                  value: torrent.ratio.toStringAsFixed(4),
-                  icon: Icons.swap_horiz_rounded,
-                ),
-              if (props == null && torrent != null && torrent.popularity > 0)
-                _DetailMetricItem(
-                  label: '流行度',
-                  value: torrent.popularity.toStringAsFixed(4),
-                  icon: Icons.local_fire_department_outlined,
-                ),
-            ],
-          ),
-          if (props != null)
-            _buildDataBlock(
-              title: '时间',
-              rows: [
-                _buildDataRow(
-                  '添加时间',
-                  QBTorrentPropertiesModel.formatTimestamp(props.additionDate),
-                  alignValueEnd: true,
-                ),
-                if (props.completionDate > 0)
-                  _buildDataRow(
-                    '完成时间',
-                    QBTorrentPropertiesModel.formatTimestamp(
-                      props.completionDate,
-                    ),
-                    alignValueEnd: true,
-                  ),
-                if (props.creationDate > 0)
-                  _buildDataRow(
-                    '创建时间',
-                    QBTorrentPropertiesModel.formatTimestamp(
-                      props.creationDate,
-                    ),
-                    alignValueEnd: true,
-                  ),
-                _buildDataRow(
-                  '最后见到',
-                  QBTorrentPropertiesModel.formatTimestamp(props.lastSeen),
-                  alignValueEnd: true,
-                ),
-                _buildDataRow(
-                  '已用时间',
-                  _timeText(props.timeElapsed),
-                  alignValueEnd: true,
-                ),
-                _buildDataRow(
-                  '做种时间',
-                  _timeText(props.seedingTime),
-                  alignValueEnd: true,
-                ),
-                _buildDataRow(
-                  'ETA',
-                  props.eta == 8640000
-                      ? '未知'
-                      : QBTorrentPropertiesModel.formatDuration(props.eta),
-                  alignValueEnd: true,
-                ),
-                if (props.reannounce > 0)
-                  _buildDataRow(
-                    '重新声明',
-                    QBTorrentPropertiesModel.formatDuration(props.reannounce),
-                    alignValueEnd: true,
-                  ),
-              ],
-            )
-          else if (torrent != null)
-            _buildDataBlock(
-              title: '时间',
-              rows: [
-                if (torrent.addedOn > 0)
-                  _buildDataRow(
-                    '添加时间',
-                    QBTorrentPropertiesModel.formatTimestamp(torrent.addedOn),
-                    alignValueEnd: true,
-                  ),
-                if (torrent.completionOn > 0)
-                  _buildDataRow(
-                    '完成时间',
-                    QBTorrentPropertiesModel.formatTimestamp(
-                      torrent.completionOn,
-                    ),
-                    alignValueEnd: true,
-                  ),
-                if (torrent.lastActivity > 0)
-                  _buildDataRow(
-                    '最后活动',
-                    QBTorrentPropertiesModel.formatTimestamp(
-                      torrent.lastActivity,
-                    ),
-                    alignValueEnd: true,
-                  ),
-                if (torrent.seenComplete > 0)
-                  _buildDataRow(
-                    '最后完整',
-                    QBTorrentPropertiesModel.formatTimestamp(
-                      torrent.seenComplete,
-                    ),
-                    alignValueEnd: true,
-                  ),
-                if (torrent.timeActive > 0)
-                  _buildDataRow(
-                    '活动时间',
-                    _timeText(torrent.timeActive.toInt()),
-                    alignValueEnd: true,
-                  ),
-                if (torrent.seedingTime > 0)
-                  _buildDataRow(
-                    '做种时间',
-                    _timeText(torrent.seedingTime),
-                    alignValueEnd: true,
-                  ),
-              ],
+  List<Widget> _buildTimeSectionChildren(
+    QBTorrentPropertiesModel? props,
+    QBTorrentModel? torrent,
+  ) {
+    if (props != null) {
+      return [
+        _buildGroupedSection(
+          title: '时间线',
+          rows: [
+            _buildGroupedRow(
+              '添加时间',
+              QBTorrentPropertiesModel.formatTimestamp(props.additionDate),
             ),
-          _buildMagnetRow(),
+            if (props.completionDate > 0)
+              _buildGroupedRow(
+                '完成时间',
+                QBTorrentPropertiesModel.formatTimestamp(props.completionDate),
+              ),
+            if (props.creationDate > 0)
+              _buildGroupedRow(
+                '创建时间',
+                QBTorrentPropertiesModel.formatTimestamp(props.creationDate),
+              ),
+            _buildGroupedRow(
+              '最后见到',
+              QBTorrentPropertiesModel.formatTimestamp(props.lastSeen),
+            ),
+            _buildGroupedRow('已用时间', _timeText(props.timeElapsed)),
+            _buildGroupedRow('做种时间', _timeText(props.seedingTime)),
+            _buildGroupedRow(
+              'ETA',
+              props.eta == 8640000
+                  ? '未知'
+                  : QBTorrentPropertiesModel.formatDuration(props.eta),
+            ),
+            if (props.reannounce > 0)
+              _buildGroupedRow(
+                '重新声明',
+                QBTorrentPropertiesModel.formatDuration(props.reannounce),
+              ),
+          ],
+        ),
+      ];
+    }
+    if (torrent == null) return [];
+    return [
+      _buildGroupedSection(
+        title: '时间线',
+        rows: [
+          if (torrent.addedOn > 0)
+            _buildGroupedRow(
+              '添加时间',
+              QBTorrentPropertiesModel.formatTimestamp(torrent.addedOn),
+            ),
+          if (torrent.completionOn > 0)
+            _buildGroupedRow(
+              '完成时间',
+              QBTorrentPropertiesModel.formatTimestamp(torrent.completionOn),
+            ),
+          if (torrent.lastActivity > 0)
+            _buildGroupedRow(
+              '最后活动',
+              QBTorrentPropertiesModel.formatTimestamp(torrent.lastActivity),
+            ),
+          if (torrent.seenComplete > 0)
+            _buildGroupedRow(
+              '最后完整',
+              QBTorrentPropertiesModel.formatTimestamp(torrent.seenComplete),
+            ),
+          if (torrent.timeActive > 0)
+            _buildGroupedRow('活动时间', _timeText(torrent.timeActive.toInt())),
+          if (torrent.seedingTime > 0)
+            _buildGroupedRow('做种时间', _timeText(torrent.seedingTime)),
+        ],
+      ),
+    ];
+  }
+
+  List<_DetailMetricItem> _transferVolumeMetrics(
+    QBTorrentPropertiesModel? props,
+    QBTorrentModel? torrent,
+  ) {
+    final scheme = Theme.of(context).colorScheme;
+    if (props != null) {
+      return [
+        _DetailMetricItem(
+          label: '已下载',
+          value: props.totalDownloaded.toHumanReadableFileSize(),
+          icon: Icons.download_rounded,
+        ),
+        _DetailMetricItem(
+          label: '已上传',
+          value: props.totalUploaded.toHumanReadableFileSize(),
+          icon: Icons.upload_rounded,
+          color: scheme.secondary,
+        ),
+        _DetailMetricItem(
+          label: '浪费流量',
+          value: props.totalWasted.toHumanReadableFileSize(),
+          icon: Icons.warning_amber_rounded,
+          color: scheme.error,
+        ),
+        _DetailMetricItem(
+          label: '会话下载',
+          value: props.totalDownloadedSession.toHumanReadableFileSize(),
+          icon: Icons.download_for_offline_outlined,
+        ),
+        _DetailMetricItem(
+          label: '会话上传',
+          value: props.totalUploadedSession.toHumanReadableFileSize(),
+          icon: Icons.publish_rounded,
+          color: scheme.secondary,
+        ),
+      ];
+    }
+    if (torrent == null) return [];
+    return [
+      _DetailMetricItem(
+        label: '已下载',
+        value: torrent.downloaded.toHumanReadableFileSize(),
+        icon: Icons.download_rounded,
+      ),
+      _DetailMetricItem(
+        label: '已上传',
+        value: torrent.uploaded.toHumanReadableFileSize(),
+        icon: Icons.upload_rounded,
+        color: scheme.secondary,
+      ),
+      _DetailMetricItem(
+        label: '会话下载',
+        value: torrent.downloadedSession.toHumanReadableFileSize(),
+        icon: Icons.download_for_offline_outlined,
+      ),
+      _DetailMetricItem(
+        label: '会话上传',
+        value: torrent.uploadedSession.toHumanReadableFileSize(),
+        icon: Icons.publish_rounded,
+        color: scheme.secondary,
+      ),
+    ];
+  }
+
+  List<_DetailMetricItem> _speedMetrics(
+    QBTorrentPropertiesModel? props,
+    QBTorrentModel? torrent,
+  ) {
+    final scheme = Theme.of(context).colorScheme;
+    return [
+      _DetailMetricItem(
+        label: '当前下载',
+        value: _downloadSpeedText(),
+        icon: Icons.south_rounded,
+        color: scheme.primary,
+      ),
+      _DetailMetricItem(
+        label: '当前上传',
+        value: _uploadSpeedText(),
+        icon: Icons.north_rounded,
+        color: scheme.secondary,
+      ),
+      if (props != null)
+        _DetailMetricItem(
+          label: '平均下载',
+          value: props.dlSpeedAvg > 0
+              ? '${props.dlSpeedAvg.toHumanReadableFileSize(round: 1)}/s'
+              : '0 B/s',
+          icon: Icons.trending_down_rounded,
+        ),
+      if (props != null)
+        _DetailMetricItem(
+          label: '平均上传',
+          value: props.upSpeedAvg > 0
+              ? '${props.upSpeedAvg.toInt().toHumanReadableFileSize(round: 1)}/s'
+              : '0 B/s',
+          icon: Icons.trending_up_rounded,
+          color: scheme.secondary,
+        ),
+      _DetailMetricItem(
+        label: '下载限制',
+        value: _limitText(props?.dlLimit ?? torrent?.dlLimit ?? -1),
+        icon: Icons.speed_rounded,
+      ),
+      _DetailMetricItem(
+        label: '上传限制',
+        value: _limitText(props?.upLimit ?? torrent?.upLimit ?? -1),
+        icon: Icons.speed_rounded,
+        color: scheme.secondary,
+      ),
+    ];
+  }
+
+  List<_DetailMetricItem> _connectionMetrics(
+    QBTorrentPropertiesModel? props,
+    QBTorrentModel? torrent,
+  ) {
+    final scheme = Theme.of(context).colorScheme;
+    if (props != null) {
+      return [
+        _DetailMetricItem(
+          label: '连接',
+          value: '${props.nbConnections}/${props.nbConnectionsLimit}',
+          icon: Icons.link_rounded,
+        ),
+        _DetailMetricItem(
+          label: '做种',
+          value: '${props.seeds}/${props.seedsTotal}',
+          icon: Icons.cloud_upload_rounded,
+          color: scheme.tertiary,
+        ),
+        _DetailMetricItem(
+          label: '下载',
+          value: '${props.peers}/${props.peersTotal}',
+          icon: Icons.cloud_download_rounded,
+        ),
+        _DetailMetricItem(
+          label: '分享率',
+          value: props.shareRatio.toStringAsFixed(2),
+          icon: Icons.swap_horiz_rounded,
+          color: scheme.tertiary,
+        ),
+        _DetailMetricItem(
+          label: '流行度',
+          value: props.popularity.toStringAsFixed(3),
+          icon: Icons.local_fire_department_outlined,
+        ),
+        _DetailMetricItem(
+          label: '分片',
+          value: '${props.piecesHave}/${props.piecesNum}',
+          icon: Icons.grid_view_rounded,
+        ),
+        _DetailMetricItem(
+          label: '分片大小',
+          value: props.pieceSize.toHumanReadableFileSize(),
+          icon: Icons.dashboard_customize_outlined,
+        ),
+        if (torrent != null && torrent.hasAvailabilityField)
+          _DetailMetricItem(
+            label: '可用性',
+            value: _availabilityText(torrent.availability),
+            icon: Icons.cloud_done_outlined,
+            color: scheme.secondary,
+          ),
+      ];
+    }
+    if (torrent == null) return [];
+    return [
+      _DetailMetricItem(
+        label: '做种',
+        value:
+            '${torrent.numComplete}/${torrent.numComplete + torrent.numIncomplete}',
+        icon: Icons.cloud_upload_rounded,
+        color: scheme.tertiary,
+      ),
+      _DetailMetricItem(
+        label: '下载',
+        value:
+            '${torrent.numIncomplete}/${torrent.numComplete + torrent.numIncomplete}',
+        icon: Icons.cloud_download_rounded,
+      ),
+      _DetailMetricItem(
+        label: '分享率',
+        value: torrent.ratio.toStringAsFixed(2),
+        icon: Icons.swap_horiz_rounded,
+        color: scheme.tertiary,
+      ),
+      if (torrent.popularity > 0)
+        _DetailMetricItem(
+          label: '流行度',
+          value: torrent.popularity.toStringAsFixed(3),
+          icon: Icons.local_fire_department_outlined,
+        ),
+      if (torrent.hasAvailabilityField)
+        _DetailMetricItem(
+          label: '可用性',
+          value: _availabilityText(torrent.availability),
+          icon: Icons.cloud_done_outlined,
+          color: scheme.secondary,
+        ),
+    ];
+  }
+
+  Widget _buildMetaChip({
+    required BuildContext context,
+    required IconData icon,
+    required String text,
+    required Color color,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color.withValues(alpha: 0.18), width: 0.6),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 12, color: color),
+          const SizedBox(width: 4),
+          Text(
+            text,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+              color: color,
+              fontWeight: FontWeight.w600,
+              fontSize: 11,
+              height: 1.1,
+            ),
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildGeneralOverviewCard(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final accent = _statusAccentColor(colorScheme);
-    final torrent = widget.torrent;
-    final title = _properties?.name.isNotEmpty == true
-        ? _properties!.name
-        : widget.name;
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(16),
-      decoration: _insetCardDecoration(
-        context,
-        radius: 16,
-        borderColor: accent.withValues(alpha: 0.28),
+  Widget _buildLiveSpeedStrip(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return _buildMetricTileWrap(
+      items: [
+        _DetailMetricItem(
+          label: '下载',
+          value: _downloadSpeedText(),
+          icon: Icons.arrow_downward_rounded,
+          color: scheme.primary,
+        ),
+        _DetailMetricItem(
+          label: '上传',
+          value: _uploadSpeedText(),
+          icon: Icons.arrow_upward_rounded,
+          color: scheme.secondary,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildOverviewMetricWrap(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final tiles = [
+      _DetailMetricItem(
+        label: '总大小',
+        value: _sizeText(),
+        icon: Icons.storage_outlined,
       ),
+      _DetailMetricItem(
+        label: '剩余',
+        value: _amountLeftText(),
+        icon: Icons.hourglass_empty_rounded,
+      ),
+      _DetailMetricItem(
+        label: 'ETA',
+        value: _etaText(),
+        icon: Icons.schedule_outlined,
+        color: scheme.primary,
+      ),
+      _DetailMetricItem(
+        label: '分享率',
+        value: _ratioText(),
+        icon: Icons.swap_horiz_rounded,
+        color: scheme.tertiary,
+      ),
+    ];
+    return _buildMetricTileWrap(items: tiles);
+  }
+
+  Widget _buildMetricSection({
+    required String title,
+    String? subtitle,
+    required List<_DetailMetricItem> items,
+  }) {
+    if (items.isEmpty) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildSectionHeader(title, subtitle: subtitle),
+          const SizedBox(height: 10),
+          _buildMetricTileWrap(items: items),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMetricTileWrap({required List<_DetailMetricItem> items}) {
+    final scheme = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final columns = constraints.maxWidth >= 520 ? 3 : 2;
+        const gap = 8.0;
+        final width = (constraints.maxWidth - gap * (columns - 1)) / columns;
+        return Wrap(
+          spacing: gap,
+          runSpacing: gap,
+          children: [
+            for (final item in items)
+              SizedBox(
+                width: width,
+                child: _buildDetailMetricTile(
+                  context,
+                  item: item,
+                  scheme: scheme,
+                  isDark: isDark,
+                ),
+              ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildDetailMetricTile(
+    BuildContext context, {
+    required _DetailMetricItem item,
+    required ColorScheme scheme,
+    required bool isDark,
+  }) {
+    final color = item.color ?? scheme.onSurfaceVariant;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainerHigh.withValues(
+          alpha: isDark ? 0.28 : 0.82,
+        ),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: scheme.outlineVariant.withValues(alpha: isDark ? 0.2 : 0.14),
+          width: 0.5,
+        ),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(item.icon, size: 14, color: color),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  item.label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                    color: scheme.onSurfaceVariant,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 11,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  item.value,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: scheme.onSurface,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 13,
+                    height: 1.2,
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildGroupedSection({
+    required String title,
+    required List<Widget> rows,
+  }) {
+    final visible = rows.where((row) {
+      if (row is SizedBox &&
+          row.child == null &&
+          row.width == null &&
+          row.height == null) {
+        return false;
+      }
+      return true;
+    }).toList();
+    if (visible.isEmpty) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildSectionHeader(title),
+          const SizedBox(height: 10),
+          _buildListGroupCard(children: visible),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildGroupedRow(
+    String label,
+    String value, {
+    bool monospace = false,
+    VoidCallback? onCopy,
+  }) {
+    if (value.trim().isEmpty) return const SizedBox.shrink();
+    final scheme = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(14, 11, 14, 11),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Expanded(
                 child: Text(
-                  title,
-                  maxLines: 3,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w800,
-                    height: 1.26,
-                    letterSpacing: 0,
+                  label,
+                  style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                    color: scheme.onSurfaceVariant,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 12,
                   ),
                 ),
               ),
-              const SizedBox(width: 10),
-              _buildStatusBadge(context, _statusText(), accent),
+              if (onCopy != null) _cupertinoCopyButton(onCopy),
             ],
           ),
-          const SizedBox(height: 12),
-          Wrap(
-            spacing: 6,
-            runSpacing: 6,
-            children: [
-              _buildInfoPill(
-                context,
-                icon: Icons.schedule_rounded,
-                text: '添加于 ${_addedTimeText()}',
-              ),
-              if (torrent != null && torrent.category.isNotEmpty)
-                _buildInfoPill(
-                  context,
-                  icon: Icons.folder_outlined,
-                  text: torrent.category,
-                  color: colorScheme.primary,
-                ),
-              if (torrent != null && torrent.tags.isNotEmpty)
-                for (final tag in torrent.tags.take(3))
-                  _buildInfoPill(
-                    context,
-                    icon: Icons.sell_outlined,
-                    text: tag,
-                    color: colorScheme.secondary,
-                  ),
-              if (torrent != null && torrent.tags.length > 3)
-                _buildInfoPill(
-                  context,
-                  icon: Icons.more_horiz_rounded,
-                  text: '+${torrent.tags.length - 3}',
-                  color: colorScheme.secondary,
-                ),
-            ],
+          const SizedBox(height: 4),
+          Text(
+            value,
+            style: _dataValueStyle(
+              context,
+              monospace: monospace,
+            ).copyWith(fontSize: 14, fontWeight: FontWeight.w600, height: 1.45),
           ),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              Text('进度', style: _dataLabelStyle(context)),
-              const Spacer(),
-              Text(
-                _progressText(),
-                style: _dataValueStyle(
-                  context,
-                  emphasize: true,
-                ).copyWith(color: accent, fontSize: 17),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(999),
-            child: LinearProgressIndicator(
-              value: _progressValue(),
-              minHeight: 10,
-              backgroundColor: colorScheme.surfaceContainerHighest.withValues(
-                alpha: 0.9,
-              ),
-              valueColor: AlwaysStoppedAnimation<Color>(accent),
-            ),
-          ),
-          const SizedBox(height: 16),
-          _buildOverviewKpiGrid(context),
         ],
       ),
     );
@@ -1290,112 +1916,6 @@ class _QbTorrentDetailSheetState extends State<QbTorrentDetailSheet> {
           fontWeight: FontWeight.w800,
           letterSpacing: 0,
         ),
-      ),
-    );
-  }
-
-  Widget _buildInfoPill(
-    BuildContext context, {
-    required IconData icon,
-    required String text,
-    Color? color,
-  }) {
-    final scheme = Theme.of(context).colorScheme;
-    final tint = color ?? scheme.onSurfaceVariant;
-    return Container(
-      constraints: const BoxConstraints(maxWidth: 190),
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-      decoration: BoxDecoration(
-        color: tint.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: tint.withValues(alpha: 0.14), width: 0.6),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 12, color: tint),
-          const SizedBox(width: 5),
-          Flexible(
-            child: Text(
-              text,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                color: tint,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 0,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildOverviewKpiGrid(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final cells = [
-      ('总大小', _sizeText()),
-      ('剩余', _amountLeftText()),
-      ('ETA', _etaText()),
-      ('分享率', _ratioText()),
-    ];
-    return Container(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: scheme.outlineVariant.withValues(alpha: 0.35),
-        ),
-      ),
-      child: Column(
-        children: [
-          Row(
-            children: [
-              Expanded(child: _buildKpiCell(context, cells[0].$1, cells[0].$2)),
-              Container(
-                width: 1,
-                height: 52,
-                color: scheme.outlineVariant.withValues(alpha: 0.35),
-              ),
-              Expanded(child: _buildKpiCell(context, cells[1].$1, cells[1].$2)),
-            ],
-          ),
-          Divider(
-            height: 1,
-            thickness: 0.5,
-            color: scheme.outlineVariant.withValues(alpha: 0.35),
-          ),
-          Row(
-            children: [
-              Expanded(child: _buildKpiCell(context, cells[2].$1, cells[2].$2)),
-              Container(
-                width: 1,
-                height: 52,
-                color: scheme.outlineVariant.withValues(alpha: 0.35),
-              ),
-              Expanded(child: _buildKpiCell(context, cells[3].$1, cells[3].$2)),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildKpiCell(BuildContext context, String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(label, style: _dataLabelStyle(context)),
-          const SizedBox(height: 4),
-          Text(
-            value,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: _dataValueStyle(context, emphasize: true),
-          ),
-        ],
       ),
     );
   }
@@ -1437,88 +1957,35 @@ class _QbTorrentDetailSheetState extends State<QbTorrentDetailSheet> {
       padding: const EdgeInsets.only(bottom: 8),
       child: SizedBox(
         width: double.infinity,
-        child: FilledButton.tonalIcon(
+        child: CupertinoButton(
+          color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(12),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           onPressed: () {
             Clipboard.setData(ClipboardData(text: magnetUri));
             showToast(message: '已复制 Magnet 链接');
           },
-          icon: const Icon(Icons.link_rounded, size: 18),
-          label: const Text('复制 Magnet 链接'),
-          style: FilledButton.styleFrom(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-            minimumSize: const Size.fromHeight(48),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(14),
-            ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                CupertinoIcons.link,
+                size: 17,
+                color: Theme.of(context).colorScheme.primary,
+              ),
+              const SizedBox(width: 6),
+              Text(
+                '复制 Magnet 链接',
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.primary,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 15,
+                ),
+              ),
+            ],
           ),
         ),
       ),
-    );
-  }
-
-  Widget _buildTrackerContent(ScrollController scrollController) {
-    return SingleChildScrollView(
-      controller: scrollController,
-      padding: const EdgeInsets.fromLTRB(12, 0, 12, 28),
-      child: _buildTrackersSection(),
-    );
-  }
-
-  Widget _buildContentContent(ScrollController scrollController) {
-    final totalSize = _files.fold<int>(0, (sum, file) => sum + file.size);
-    final doneSize = _files.fold<int>(
-      0,
-      (sum, file) => sum + (file.size * file.progress).round(),
-    );
-    final completeCount = _files.where((file) => file.progress >= 1).length;
-    final skippedCount = _files.where((file) => file.priority == 0).length;
-
-    return CustomScrollView(
-      controller: scrollController,
-      slivers: [
-        SliverPadding(
-          padding: const EdgeInsets.fromLTRB(12, 0, 12, 0),
-          sliver: SliverToBoxAdapter(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildBlockTitle('文件列表', subtitle: '${_files.length} 个文件'),
-                const SizedBox(height: 8),
-              ],
-            ),
-          ),
-        ),
-        if (_isLoadingFiles)
-          SliverPadding(
-            padding: const EdgeInsets.fromLTRB(12, 0, 12, 28),
-            sliver: SliverToBoxAdapter(child: _buildFilesLoadingState()),
-          )
-        else if (_files.isEmpty)
-          SliverPadding(
-            padding: const EdgeInsets.fromLTRB(12, 0, 12, 28),
-            sliver: SliverToBoxAdapter(child: _buildFilesEmptyState()),
-          )
-        else ...[
-          SliverPadding(
-            padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
-            sliver: SliverToBoxAdapter(
-              child: _buildFilesSummaryGrid(
-                totalSize: totalSize,
-                doneSize: doneSize,
-                completeCount: completeCount,
-                skippedCount: skippedCount,
-              ),
-            ),
-          ),
-          SliverPadding(
-            padding: const EdgeInsets.fromLTRB(12, 0, 12, 28),
-            sliver: SliverList.builder(
-              itemCount: _files.length,
-              itemBuilder: (context, index) => _buildFileItem(_files[index]),
-            ),
-          ),
-        ],
-      ],
     );
   }
 
@@ -1526,79 +1993,62 @@ class _QbTorrentDetailSheetState extends State<QbTorrentDetailSheet> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildBlockTitle('Tracker 列表', subtitle: '${_trackers.length} 个来源'),
-        const SizedBox(height: 8),
+        _buildSectionHeader('Tracker 列表', subtitle: '${_trackers.length} 个来源'),
+        const SizedBox(height: 14),
         if (_isLoadingTrackers)
-          Center(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 24),
-              child: Column(
-                children: [
-                  CircularProgressIndicator(
-                    color: Theme.of(context).colorScheme.primary,
-                    strokeWidth: 2.5,
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    '加载 Tracker…',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                ],
-              ),
-            ),
+          _buildPanelPlaceholder(
+            icon: Icons.radar_rounded,
+            message: '加载 Tracker…',
+            loading: true,
           )
         else if (_trackers.isEmpty)
-          Center(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 28),
-              child: Column(
-                children: [
-                  Icon(
-                    Icons.radar_rounded,
-                    size: 40,
-                    color: Theme.of(
-                      context,
-                    ).colorScheme.onSurfaceVariant.withValues(alpha: 0.45),
-                  ),
-                  const SizedBox(height: 10),
-                  Text(
-                    '暂无 Tracker',
-                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
-              ),
-            ),
+          _buildPanelPlaceholder(
+            icon: Icons.radar_rounded,
+            message: '暂无 Tracker',
           )
         else ...[
-          _buildTrackerSummaryCard(context),
-          const SizedBox(height: 10),
-          ..._trackers.asMap().entries.map((entry) {
-            final index = entry.key;
-            final tracker = entry.value;
-            return _buildTrackerItem(tracker, index);
-          }),
+          _buildTrackerSummaryGrid(context),
+          const SizedBox(height: 12),
+          _buildListGroupCard(
+            children: [
+              for (var i = 0; i < _trackers.length; i++)
+                _buildTrackerItem(_trackers[i], i),
+            ],
+          ),
         ],
-        const SizedBox(height: 8),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.end,
-          children: [
-            TextButton.icon(
-              onPressed: () => _showAddTrackerDialog(),
-              icon: const Icon(Icons.add),
-              label: const Text('添加'),
+        const SizedBox(height: 4),
+        Align(
+          alignment: Alignment.centerRight,
+          child: CupertinoButton(
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+            onPressed: () => _showAddTrackerDialog(),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  CupertinoIcons.add,
+                  size: 18,
+                  color: Theme.of(context).colorScheme.primary,
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  '添加 Tracker',
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.primary,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 15,
+                  ),
+                ),
+              ],
             ),
-          ],
+          ),
         ),
       ],
     );
   }
 
-  Widget _buildTrackerSummaryCard(BuildContext context) {
+  Widget _buildTrackerSummaryGrid(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     final working = _trackers.where((t) => t.status == 2).length;
     final inactive = _trackers
         .where((t) => t.status == 0 || t.status == 1)
@@ -1607,55 +2057,33 @@ class _QbTorrentDetailSheetState extends State<QbTorrentDetailSheet> {
         .where((t) => t.status == 3 || t.status == 4)
         .length;
     final special = _trackers.where((t) => t.isSpecialTracker).length;
-    return _buildCompactSummaryGrid(
-      context,
+    return _buildMetricTileWrap(
       items: [
         _DetailMetricItem(
           label: '工作',
           value: '$working',
           icon: Icons.check_circle_outline_rounded,
-          color: const Color(0xFF22C55E),
+          color: scheme.tertiary,
         ),
         _DetailMetricItem(
           label: '未联系/禁用',
           value: '$inactive',
           icon: Icons.pause_circle_outline_rounded,
-          color: Theme.of(context).colorScheme.secondary,
+          color: scheme.secondary,
         ),
         _DetailMetricItem(
           label: '失败',
           value: '$failed',
           icon: Icons.error_outline_rounded,
-          color: Theme.of(context).colorScheme.error,
+          color: scheme.error,
         ),
         _DetailMetricItem(
           label: '特殊来源',
           value: '$special',
           icon: Icons.hub_outlined,
-          color: Theme.of(context).colorScheme.tertiary,
+          color: scheme.primary,
         ),
       ],
-    );
-  }
-
-  Widget _buildCompactSummaryGrid(
-    BuildContext context, {
-    required List<_DetailMetricItem> items,
-  }) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final columns = constraints.maxWidth >= 520 ? 4 : 2;
-        const gap = 6.0;
-        final width = (constraints.maxWidth - gap * (columns - 1)) / columns;
-        return Wrap(
-          spacing: gap,
-          runSpacing: gap,
-          children: [
-            for (final item in items)
-              SizedBox(width: width, child: _buildMetricCard(context, item)),
-          ],
-        );
-      },
     );
   }
 
@@ -1695,13 +2123,8 @@ class _QbTorrentDetailSheetState extends State<QbTorrentDetailSheet> {
         message.isNotEmpty &&
         message != tracker.statusText;
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.fromLTRB(10, 9, 10, 9),
-      decoration: _insetCardDecoration(
-        context,
-        borderColor: statusColor.withValues(alpha: 0.35),
-      ),
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 10, 8, 10),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -1711,17 +2134,18 @@ class _QbTorrentDetailSheetState extends State<QbTorrentDetailSheet> {
               Container(
                 width: 8,
                 height: 8,
-                margin: const EdgeInsets.only(right: 8),
+                margin: const EdgeInsets.only(top: 6, right: 8),
                 decoration: BoxDecoration(
                   color: statusColor,
                   shape: BoxShape.circle,
                 ),
               ),
               Expanded(
-                child: SelectableText(
+                child: Text(
                   tracker.url,
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                     fontWeight: FontWeight.w600,
+                    height: 1.4,
                     fontStyle: tracker.isSpecialTracker
                         ? FontStyle.italic
                         : FontStyle.normal,
@@ -1729,83 +2153,34 @@ class _QbTorrentDetailSheetState extends State<QbTorrentDetailSheet> {
                         ? Theme.of(context).colorScheme.onSurfaceVariant
                         : Theme.of(context).colorScheme.onSurface,
                   ),
-                  contextMenuBuilder: (context, editableTextState) {
-                    return AdaptiveTextSelectionToolbar.buttonItems(
-                      anchors: editableTextState.contextMenuAnchors,
-                      buttonItems: [
-                        ContextMenuButtonItem(
-                          label: '复制',
-                          onPressed: () {
-                            final selection =
-                                editableTextState.textEditingValue.selection;
-                            if (selection.isValid && !selection.isCollapsed) {
-                              final selectedText = selection.textInside(
-                                tracker.url,
-                              );
-                              Clipboard.setData(
-                                ClipboardData(text: selectedText),
-                              );
-                              showToast(message: '已复制到剪贴板');
-                            }
-                            ContextMenuController.removeAny();
-                          },
-                        ),
-                      ],
-                    );
-                  },
                 ),
               ),
               const SizedBox(width: 8),
-              _buildStatusBadge(context, tracker.statusText, statusColor),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                decoration: BoxDecoration(
+                  color: statusColor.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  tracker.statusText,
+                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                    color: statusColor,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 10,
+                  ),
+                ),
+              ),
               if (!tracker.isSpecialTracker)
-                PopupMenuButton<String>(
-                  icon: const Icon(Icons.more_vert, size: 20),
+                CupertinoButton(
                   padding: EdgeInsets.zero,
-                  onSelected: (value) {
-                    switch (value) {
-                      case 'edit':
-                        _showEditTrackerDialog(tracker);
-                        break;
-                      case 'remove':
-                        _showRemoveTrackerConfirm(tracker);
-                        break;
-                      case 'copy':
-                        _copyTrackerUrl(tracker.url);
-                        break;
-                    }
-                  },
-                  itemBuilder: (context) => [
-                    const PopupMenuItem(
-                      value: 'edit',
-                      child: Row(
-                        children: [
-                          Icon(Icons.edit, size: 18),
-                          SizedBox(width: 8),
-                          Text('编辑'),
-                        ],
-                      ),
-                    ),
-                    const PopupMenuItem(
-                      value: 'copy',
-                      child: Row(
-                        children: [
-                          Icon(Icons.copy, size: 18),
-                          SizedBox(width: 8),
-                          Text('复制'),
-                        ],
-                      ),
-                    ),
-                    const PopupMenuItem(
-                      value: 'remove',
-                      child: Row(
-                        children: [
-                          Icon(Icons.delete, size: 18, color: Colors.red),
-                          SizedBox(width: 8),
-                          Text('移除', style: TextStyle(color: Colors.red)),
-                        ],
-                      ),
-                    ),
-                  ],
+                  minimumSize: Size.zero,
+                  onPressed: () => _showTrackerActionSheet(tracker),
+                  child: Icon(
+                    CupertinoIcons.ellipsis,
+                    size: 20,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
                 ),
             ],
           ),
@@ -1837,29 +2212,24 @@ class _QbTorrentDetailSheetState extends State<QbTorrentDetailSheet> {
     final scheme = Theme.of(context).colorScheme;
     final tint = color ?? scheme.onSurfaceVariant;
     return Container(
-      constraints: const BoxConstraints(minHeight: 22, maxWidth: 160),
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
       decoration: BoxDecoration(
-        color: tint.withValues(alpha: 0.07),
-        borderRadius: BorderRadius.circular(7),
+        color: tint.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(8),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 11, color: tint),
+          Icon(icon, size: 12, color: tint),
           const SizedBox(width: 4),
-          Flexible(
-            child: Text(
-              text,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                color: tint,
-                fontSize: 10.5,
-                fontWeight: FontWeight.w700,
-                height: 1,
-                letterSpacing: 0,
-              ),
+          Text(
+            text,
+            maxLines: 2,
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+              color: tint,
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              height: 1.2,
             ),
           ),
         ],
@@ -1885,64 +2255,14 @@ class _QbTorrentDetailSheetState extends State<QbTorrentDetailSheet> {
     }
   }
 
-  Widget _buildFilesLoadingState() {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 24),
-        child: Column(
-          children: [
-            CircularProgressIndicator(
-              color: Theme.of(context).colorScheme.primary,
-              strokeWidth: 2.5,
-            ),
-            const SizedBox(height: 12),
-            Text(
-              '加载文件列表…',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildFilesEmptyState() {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 28),
-        child: Column(
-          children: [
-            Icon(
-              Icons.folder_open_rounded,
-              size: 40,
-              color: Theme.of(
-                context,
-              ).colorScheme.onSurfaceVariant.withValues(alpha: 0.45),
-            ),
-            const SizedBox(height: 10),
-            Text(
-              '暂无文件',
-              style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   Widget _buildFilesSummaryGrid({
     required int totalSize,
     required int doneSize,
     required int completeCount,
     required int skippedCount,
   }) {
-    return _buildCompactSummaryGrid(
-      context,
+    final scheme = Theme.of(context).colorScheme;
+    return _buildMetricTileWrap(
       items: [
         _DetailMetricItem(
           label: '总大小',
@@ -1953,19 +2273,19 @@ class _QbTorrentDetailSheetState extends State<QbTorrentDetailSheet> {
           label: '已完成',
           value: doneSize.toHumanReadableFileSize(),
           icon: Icons.check_circle_outline_rounded,
-          color: const Color(0xFF22C55E),
+          color: scheme.tertiary,
         ),
         _DetailMetricItem(
           label: '完整文件',
           value: '$completeCount',
           icon: Icons.task_alt_rounded,
-          color: Theme.of(context).colorScheme.secondary,
+          color: scheme.secondary,
         ),
         _DetailMetricItem(
           label: '跳过',
           value: '$skippedCount',
           icon: Icons.block_rounded,
-          color: Theme.of(context).colorScheme.error,
+          color: scheme.error,
         ),
       ],
     );
@@ -1974,19 +2294,11 @@ class _QbTorrentDetailSheetState extends State<QbTorrentDetailSheet> {
   Widget _buildFileItem(QBTorrentFileModel file) {
     final scheme = Theme.of(context).colorScheme;
     final progressColor = file.progress >= 1.0
-        ? const Color(0xFF22C55E)
+        ? scheme.tertiary
         : scheme.primary;
     final completedSize = (file.size * file.progress).round();
-    return Container(
-      margin: const EdgeInsets.only(bottom: 7),
-      padding: const EdgeInsets.fromLTRB(10, 9, 10, 9),
-      decoration: _insetCardDecoration(
-        context,
-        radius: 12,
-        borderColor: file.priority == 0
-            ? scheme.error.withValues(alpha: 0.22)
-            : scheme.outlineVariant.withValues(alpha: 0.32),
-      ),
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -2128,7 +2440,7 @@ class _QbTorrentDetailSheetState extends State<QbTorrentDetailSheet> {
                   context,
                   icon: Icons.upload_rounded,
                   text: '已做种',
-                  color: const Color(0xFF22C55E),
+                  color: scheme.tertiary,
                 ),
             ],
           ),
@@ -2234,27 +2546,64 @@ class _QbTorrentDetailSheetState extends State<QbTorrentDetailSheet> {
     showToast(message: 'Tracker URL 已复制到剪贴板');
   }
 
+  void _showTrackerActionSheet(QBTrackerModel tracker) {
+    showCupertinoModalPopup<void>(
+      context: context,
+      builder: (context) => CupertinoActionSheet(
+        actions: [
+          CupertinoActionSheetAction(
+            onPressed: () {
+              Navigator.of(context).pop();
+              _showEditTrackerDialog(tracker);
+            },
+            child: const Text('编辑'),
+          ),
+          CupertinoActionSheetAction(
+            onPressed: () {
+              Navigator.of(context).pop();
+              _copyTrackerUrl(tracker.url);
+            },
+            child: const Text('复制'),
+          ),
+          CupertinoActionSheetAction(
+            isDestructiveAction: true,
+            onPressed: () {
+              Navigator.of(context).pop();
+              _showRemoveTrackerConfirm(tracker);
+            },
+            child: const Text('移除'),
+          ),
+        ],
+        cancelButton: CupertinoActionSheetAction(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('取消'),
+        ),
+      ),
+    );
+  }
+
   void _showAddTrackerDialog() {
     final urlController = TextEditingController();
 
-    showDialog(
+    showCupertinoDialog<void>(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (context) => CupertinoAlertDialog(
         title: const Text('添加 Tracker'),
-        content: TextField(
-          controller: urlController,
-          decoration: const InputDecoration(
-            labelText: 'Tracker URL',
-            hintText: '请输入 Tracker URL',
+        content: Padding(
+          padding: const EdgeInsets.only(top: 12),
+          child: CupertinoTextField(
+            controller: urlController,
+            placeholder: 'Tracker URL',
+            autofocus: true,
           ),
-          autofocus: true,
         ),
         actions: [
-          TextButton(
+          CupertinoDialogAction(
             onPressed: () => Navigator.of(context).pop(),
             child: const Text('取消'),
           ),
-          ElevatedButton(
+          CupertinoDialogAction(
+            isDefaultAction: true,
             onPressed: () async {
               final url = urlController.text.trim();
               if (url.isEmpty) {
@@ -2280,21 +2629,25 @@ class _QbTorrentDetailSheetState extends State<QbTorrentDetailSheet> {
   void _showEditTrackerDialog(QBTrackerModel tracker) {
     final urlController = TextEditingController(text: tracker.url);
 
-    showDialog(
+    showCupertinoDialog<void>(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (context) => CupertinoAlertDialog(
         title: const Text('编辑 Tracker'),
-        content: TextField(
-          controller: urlController,
-          decoration: const InputDecoration(labelText: 'Tracker URL'),
-          autofocus: true,
+        content: Padding(
+          padding: const EdgeInsets.only(top: 12),
+          child: CupertinoTextField(
+            controller: urlController,
+            placeholder: 'Tracker URL',
+            autofocus: true,
+          ),
         ),
         actions: [
-          TextButton(
+          CupertinoDialogAction(
             onPressed: () => Navigator.of(context).pop(),
             child: const Text('取消'),
           ),
-          ElevatedButton(
+          CupertinoDialogAction(
+            isDefaultAction: true,
             onPressed: () async {
               final newUrl = urlController.text.trim();
               if (newUrl.isEmpty) {
@@ -2322,17 +2675,18 @@ class _QbTorrentDetailSheetState extends State<QbTorrentDetailSheet> {
   }
 
   void _showRemoveTrackerConfirm(QBTrackerModel tracker) {
-    showDialog(
+    showCupertinoDialog<void>(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (context) => CupertinoAlertDialog(
         title: const Text('确认移除'),
         content: Text('确定要移除 Tracker:\n${tracker.url}?'),
         actions: [
-          TextButton(
+          CupertinoDialogAction(
             onPressed: () => Navigator.of(context).pop(),
             child: const Text('取消'),
           ),
-          ElevatedButton(
+          CupertinoDialogAction(
+            isDestructiveAction: true,
             onPressed: () async {
               Navigator.of(context).pop();
               final success = await controller.removeTrackers(widget.hash, [
@@ -2345,10 +2699,6 @@ class _QbTorrentDetailSheetState extends State<QbTorrentDetailSheet> {
                 showToast(message: '移除失败');
               }
             },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
-              foregroundColor: Colors.white,
-            ),
             child: const Text('移除'),
           ),
         ],
