@@ -727,7 +727,6 @@ class _DownloaderTorrentListPageState extends State<DownloaderTorrentListPage> {
   }
 
   Widget _buildSelectionFloatingBar(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
     final ops = _selectionBarOps();
     const primaryCount = 4;
     const wideBarW = 640.0;
@@ -763,13 +762,7 @@ class _DownloaderTorrentListPageState extends State<DownloaderTorrentListPage> {
                         horizontal: 4,
                         vertical: 2,
                       ),
-                      decoration: BoxDecoration(
-                        color: scheme.surface.withValues(alpha: 0.9),
-                        borderRadius: BorderRadius.circular(999),
-                        border: Border.all(
-                          color: scheme.outline.withValues(alpha: 0.1),
-                        ),
-                      ),
+                      decoration: _floatingBarDecoration(context),
                       child: Row(
                         children: [
                           for (final o in inlineOps)
@@ -1034,6 +1027,32 @@ class _DownloaderTorrentListPageState extends State<DownloaderTorrentListPage> {
     );
   }
 
+  BoxDecoration _floatingBarDecoration(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return BoxDecoration(
+      color: isDark
+          ? const Color(0xFF2C2C2E).withValues(alpha: 0.96)
+          : scheme.surface.withValues(alpha: 0.98),
+      borderRadius: BorderRadius.circular(999),
+      border: Border.all(
+        color: scheme.outlineVariant.withValues(alpha: isDark ? 0.55 : 0.45),
+        width: 0.8,
+      ),
+    );
+  }
+
+  Widget _floatingBarDivider(BuildContext context) {
+    return Container(
+      width: 1,
+      height: 20,
+      margin: const EdgeInsets.symmetric(horizontal: 6),
+      color: Theme.of(context).colorScheme.outlineVariant.withValues(
+        alpha: Theme.of(context).brightness == Brightness.dark ? 0.35 : 0.4,
+      ),
+    );
+  }
+
   Widget _buildFloatingToolbar(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -1043,28 +1062,17 @@ class _DownloaderTorrentListPageState extends State<DownloaderTorrentListPage> {
             child: ClipRRect(
               borderRadius: BorderRadius.circular(999),
               child: BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: 40, sigmaY: 40),
+                filter: ImageFilter.blur(sigmaX: 32, sigmaY: 32),
                 child: Container(
                   height: 52,
-                  padding: const EdgeInsets.symmetric(horizontal: 14),
-                  decoration: BoxDecoration(
-                    color: Theme.of(
-                      context,
-                    ).colorScheme.surface.withValues(alpha: 0.86),
-                    borderRadius: BorderRadius.circular(999),
-                    border: Border.all(
-                      color: Theme.of(
-                        context,
-                      ).colorScheme.outline.withValues(alpha: 0.08),
-                      width: 0.5,
-                    ),
-                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                  decoration: _floatingBarDecoration(context),
                   child: Row(
                     children: [
                       _buildFloatingFilterButton(context),
-                      const SizedBox(width: 8),
+                      _floatingBarDivider(context),
                       Expanded(child: _buildFloatingFakeInputBar(context)),
-                      const SizedBox(width: 8),
+                      _floatingBarDivider(context),
                       _buildFloatingSortBy(context),
                     ],
                   ),
@@ -1116,15 +1124,9 @@ class _DownloaderTorrentListPageState extends State<DownloaderTorrentListPage> {
       final tr = controller as TransmissionController;
       return GestureDetector(
         onTap: () => _openTrKeywordSheet(context),
-        child: Container(
+        behavior: HitTestBehavior.opaque,
+        child: SizedBox(
           height: 36,
-          padding: const EdgeInsets.symmetric(horizontal: 12),
-          decoration: BoxDecoration(
-            color: Theme.of(
-              context,
-            ).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
-            borderRadius: BorderRadius.circular(999),
-          ),
           child: Row(
             children: [
               Icon(
@@ -1152,22 +1154,17 @@ class _DownloaderTorrentListPageState extends State<DownloaderTorrentListPage> {
       );
     }
     if (controller is! QBController) {
-      return Container(
+      return SizedBox(
         height: 36,
-        padding: const EdgeInsets.symmetric(horizontal: 12),
-        decoration: BoxDecoration(
-          color: Theme.of(
-            context,
-          ).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
-          borderRadius: BorderRadius.circular(999),
-        ),
-        alignment: Alignment.centerLeft,
-        child: Text(
-          '当前下载器不支持筛选',
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-            color: Theme.of(context).colorScheme.onSurfaceVariant,
+        child: Align(
+          alignment: Alignment.centerLeft,
+          child: Text(
+            '当前下载器不支持筛选',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
           ),
         ),
       );
@@ -1175,15 +1172,9 @@ class _DownloaderTorrentListPageState extends State<DownloaderTorrentListPage> {
     final qbController = controller as QBController;
     return GestureDetector(
       onTap: () => _openKeywordSheet(context),
-      child: Container(
+      behavior: HitTestBehavior.opaque,
+      child: SizedBox(
         height: 36,
-        padding: const EdgeInsets.symmetric(horizontal: 12),
-        decoration: BoxDecoration(
-          color: Theme.of(
-            context,
-          ).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
-          borderRadius: BorderRadius.circular(999),
-        ),
         child: Row(
           children: [
             Icon(

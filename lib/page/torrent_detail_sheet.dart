@@ -59,7 +59,9 @@ class _QbTorrentDetailSheetState extends State<QbTorrentDetailSheet> {
   String _detailSegment = 'overview';
 
   static const _floatingTabBarHeight = 56.0;
-  static const _sheetPageHorizontalPadding = 16.0;
+  static const _sheetPageHorizontalPadding = 10.0;
+  static const _sheetPageShellPadding = EdgeInsets.fromLTRB(8, 12, 8, 12);
+  static const _sheetContentHorizontalPadding = 8.0;
   static const _sheetPageRadius = 18.0;
 
   static const _mainPanelDefs = [
@@ -218,7 +220,7 @@ class _QbTorrentDetailSheetState extends State<QbTorrentDetailSheet> {
             padding: const EdgeInsets.fromLTRB(
               _sheetPageHorizontalPadding,
               0,
-              8,
+              2,
               8,
             ),
             child: _buildTorrentHeader(context),
@@ -255,7 +257,7 @@ class _QbTorrentDetailSheetState extends State<QbTorrentDetailSheet> {
             padding: const EdgeInsets.fromLTRB(
               _sheetPageHorizontalPadding,
               0,
-              8,
+              2,
               8,
             ),
             child: _buildTorrentHeader(context),
@@ -326,7 +328,7 @@ class _QbTorrentDetailSheetState extends State<QbTorrentDetailSheet> {
           padding: const EdgeInsets.fromLTRB(
             _sheetPageHorizontalPadding,
             0,
-            4,
+            2,
             4,
           ),
           sliver: SliverToBoxAdapter(child: _buildTorrentHeader(context)),
@@ -846,7 +848,7 @@ class _QbTorrentDetailSheetState extends State<QbTorrentDetailSheet> {
   Widget _buildSheetPageShell({required Widget child}) {
     return DecoratedBox(
       decoration: _sheetPageDecoration(context),
-      child: Padding(padding: const EdgeInsets.all(14), child: child),
+      child: Padding(padding: _sheetPageShellPadding, child: child),
     );
   }
 
@@ -999,8 +1001,8 @@ class _QbTorrentDetailSheetState extends State<QbTorrentDetailSheet> {
               Divider(
                 height: 1,
                 thickness: 0.5,
-                indent: 12,
-                endIndent: 12,
+                indent: 44,
+                endIndent: _sheetContentHorizontalPadding,
                 color: scheme.outlineVariant.withValues(alpha: 0.3),
               ),
             visible[i],
@@ -1366,75 +1368,59 @@ class _QbTorrentDetailSheetState extends State<QbTorrentDetailSheet> {
   ) {
     if (props != null) {
       return [
-        _buildGroupedSection(
-          title: '时间线',
-          rows: [
-            _buildGroupedRow(
-              '添加时间',
-              QBTorrentPropertiesModel.formatTimestamp(props.additionDate),
+        _buildTimelineSection([
+          (
+            '添加时间',
+            QBTorrentPropertiesModel.formatTimestamp(props.additionDate),
+          ),
+          if (props.completionDate > 0)
+            (
+              '完成时间',
+              QBTorrentPropertiesModel.formatTimestamp(props.completionDate),
             ),
-            if (props.completionDate > 0)
-              _buildGroupedRow(
-                '完成时间',
-                QBTorrentPropertiesModel.formatTimestamp(props.completionDate),
-              ),
-            if (props.creationDate > 0)
-              _buildGroupedRow(
-                '创建时间',
-                QBTorrentPropertiesModel.formatTimestamp(props.creationDate),
-              ),
-            _buildGroupedRow(
-              '最后见到',
-              QBTorrentPropertiesModel.formatTimestamp(props.lastSeen),
+          if (props.creationDate > 0)
+            (
+              '创建时间',
+              QBTorrentPropertiesModel.formatTimestamp(props.creationDate),
             ),
-            _buildGroupedRow('已用时间', _timeText(props.timeElapsed)),
-            _buildGroupedRow('做种时间', _timeText(props.seedingTime)),
-            _buildGroupedRow(
-              'ETA',
-              props.eta == 8640000
-                  ? '未知'
-                  : QBTorrentPropertiesModel.formatDuration(props.eta),
-            ),
-            if (props.reannounce > 0)
-              _buildGroupedRow(
-                '重新声明',
-                QBTorrentPropertiesModel.formatDuration(props.reannounce),
-              ),
-          ],
-        ),
+          ('最后见到', QBTorrentPropertiesModel.formatTimestamp(props.lastSeen)),
+          ('已用时间', _timeText(props.timeElapsed)),
+          ('做种时间', _timeText(props.seedingTime)),
+          (
+            'ETA',
+            props.eta == 8640000
+                ? '未知'
+                : QBTorrentPropertiesModel.formatDuration(props.eta),
+          ),
+          if (props.reannounce > 0)
+            ('重新声明', QBTorrentPropertiesModel.formatDuration(props.reannounce)),
+        ]),
       ];
     }
     if (torrent == null) return [];
     return [
-      _buildGroupedSection(
-        title: '时间线',
-        rows: [
-          if (torrent.addedOn > 0)
-            _buildGroupedRow(
-              '添加时间',
-              QBTorrentPropertiesModel.formatTimestamp(torrent.addedOn),
-            ),
-          if (torrent.completionOn > 0)
-            _buildGroupedRow(
-              '完成时间',
-              QBTorrentPropertiesModel.formatTimestamp(torrent.completionOn),
-            ),
-          if (torrent.lastActivity > 0)
-            _buildGroupedRow(
-              '最后活动',
-              QBTorrentPropertiesModel.formatTimestamp(torrent.lastActivity),
-            ),
-          if (torrent.seenComplete > 0)
-            _buildGroupedRow(
-              '最后完整',
-              QBTorrentPropertiesModel.formatTimestamp(torrent.seenComplete),
-            ),
-          if (torrent.timeActive > 0)
-            _buildGroupedRow('活动时间', _timeText(torrent.timeActive.toInt())),
-          if (torrent.seedingTime > 0)
-            _buildGroupedRow('做种时间', _timeText(torrent.seedingTime)),
-        ],
-      ),
+      _buildTimelineSection([
+        if (torrent.addedOn > 0)
+          ('添加时间', QBTorrentPropertiesModel.formatTimestamp(torrent.addedOn)),
+        if (torrent.completionOn > 0)
+          (
+            '完成时间',
+            QBTorrentPropertiesModel.formatTimestamp(torrent.completionOn),
+          ),
+        if (torrent.lastActivity > 0)
+          (
+            '最后活动',
+            QBTorrentPropertiesModel.formatTimestamp(torrent.lastActivity),
+          ),
+        if (torrent.seenComplete > 0)
+          (
+            '最后完整',
+            QBTorrentPropertiesModel.formatTimestamp(torrent.seenComplete),
+          ),
+        if (torrent.timeActive > 0)
+          ('活动时间', _timeText(torrent.timeActive.toInt())),
+        if (torrent.seedingTime > 0) ('做种时间', _timeText(torrent.seedingTime)),
+      ]),
     ];
   }
 
@@ -1857,6 +1843,269 @@ class _QbTorrentDetailSheetState extends State<QbTorrentDetailSheet> {
     );
   }
 
+  IconData _groupedRowIcon(String label) {
+    switch (label) {
+      case '名称':
+        return CupertinoIcons.doc_text;
+      case '哈希':
+      case 'Infohash V1':
+      case 'Infohash V2':
+        return CupertinoIcons.number;
+      case '私有':
+      case '元数据':
+        return CupertinoIcons.lock_shield;
+      case '分类':
+        return CupertinoIcons.folder;
+      case '标签':
+        return CupertinoIcons.tag;
+      case '创建者':
+        return CupertinoIcons.person;
+      case '注释':
+        return CupertinoIcons.text_quote;
+      case '保存路径':
+      case '下载路径':
+      case '内容路径':
+      case '根路径':
+        return CupertinoIcons.folder;
+      case 'Tracker':
+        return CupertinoIcons.antenna_radiowaves_left_right;
+      case '添加时间':
+        return CupertinoIcons.plus_circle;
+      case '完成时间':
+        return CupertinoIcons.checkmark_circle;
+      case '创建时间':
+        return CupertinoIcons.calendar;
+      case '最后见到':
+      case '最后活动':
+        return CupertinoIcons.eye;
+      case '最后完整':
+        return CupertinoIcons.checkmark_seal;
+      case '已用时间':
+      case '活动时间':
+        return CupertinoIcons.time;
+      case '做种时间':
+        return CupertinoIcons.arrow_up_circle;
+      case 'ETA':
+        return CupertinoIcons.hourglass;
+      case '重新声明':
+        return CupertinoIcons.arrow_clockwise;
+      default:
+        return CupertinoIcons.info_circle;
+    }
+  }
+
+  Color _groupedRowIconColor(String label, ColorScheme scheme) {
+    switch (label) {
+      case '完成时间':
+      case '最后完整':
+        return scheme.tertiary;
+      case 'ETA':
+        return scheme.primary;
+      case '做种时间':
+        return scheme.secondary;
+      case '私有':
+      case '元数据':
+        return scheme.onSurfaceVariant;
+      default:
+        return scheme.primary;
+    }
+  }
+
+  Widget _buildGroupedRowIconBox(String label) {
+    final scheme = Theme.of(context).colorScheme;
+    final color = _groupedRowIconColor(label, scheme);
+    return Container(
+      width: 30,
+      height: 30,
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Icon(_groupedRowIcon(label), size: 15, color: color),
+    );
+  }
+
+  Widget _buildBoolPill(String value) {
+    final scheme = Theme.of(context).colorScheme;
+    final isYes = value == '是';
+    final color = isYes ? scheme.tertiary : scheme.onSurfaceVariant;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Text(
+        value,
+        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+          color: color,
+          fontWeight: FontWeight.w700,
+          fontSize: 12,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildGroupedValue(String value, {bool monospace = false}) {
+    if (value == '是' || value == '否') {
+      return _buildBoolPill(value);
+    }
+    return Text(
+      value,
+      style: _dataValueStyle(
+        context,
+        monospace: monospace,
+      ).copyWith(fontSize: 14, fontWeight: FontWeight.w600, height: 1.45),
+    );
+  }
+
+  Widget _buildGroupedRowContent({
+    required String label,
+    required String value,
+    bool monospace = false,
+    VoidCallback? onCopy,
+  }) {
+    final scheme = Theme.of(context).colorScheme;
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildGroupedRowIconBox(label),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                  color: scheme.onSurfaceVariant,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 11,
+                  letterSpacing: 0.2,
+                ),
+              ),
+              const SizedBox(height: 3),
+              _buildGroupedValue(value, monospace: monospace),
+            ],
+          ),
+        ),
+        if (onCopy != null) _cupertinoCopyButton(onCopy),
+      ],
+    );
+  }
+
+  Widget _buildTimelineSection(List<(String label, String value)> entries) {
+    final visible = entries
+        .where((entry) => entry.$2.trim().isNotEmpty)
+        .toList();
+    if (visible.isEmpty) return const SizedBox.shrink();
+    final scheme = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildSectionHeader('时间线'),
+          const SizedBox(height: 10),
+          Container(
+            width: double.infinity,
+            decoration: _insetCardDecoration(context, radius: 14),
+            clipBehavior: Clip.antiAlias,
+            child: Column(
+              children: [
+                for (var i = 0; i < visible.length; i++) ...[
+                  if (i > 0)
+                    Divider(
+                      height: 1,
+                      thickness: 0.5,
+                      indent: 44,
+                      endIndent: _sheetContentHorizontalPadding,
+                      color: scheme.outlineVariant.withValues(alpha: 0.3),
+                    ),
+                  _buildTimelineRow(
+                    visible[i].$1,
+                    visible[i].$2,
+                    isLast: i == visible.length - 1,
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTimelineRow(String label, String value, {required bool isLast}) {
+    final scheme = Theme.of(context).colorScheme;
+    final accent = _groupedRowIconColor(label, scheme);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        _sheetContentHorizontalPadding,
+        10,
+        _sheetContentHorizontalPadding,
+        10,
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 18,
+            child: Column(
+              children: [
+                Container(
+                  width: 8,
+                  height: 8,
+                  decoration: BoxDecoration(
+                    color: accent,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+                if (!isLast)
+                  Container(
+                    width: 2,
+                    height: 36,
+                    margin: const EdgeInsets.only(top: 4),
+                    decoration: BoxDecoration(
+                      color: scheme.outlineVariant.withValues(alpha: 0.35),
+                      borderRadius: BorderRadius.circular(1),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                    color: scheme.onSurfaceVariant,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 11,
+                    letterSpacing: 0.2,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  value,
+                  style: _dataValueStyle(context).copyWith(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    height: 1.45,
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildGroupedRow(
     String label,
     String value, {
@@ -1864,36 +2113,18 @@ class _QbTorrentDetailSheetState extends State<QbTorrentDetailSheet> {
     VoidCallback? onCopy,
   }) {
     if (value.trim().isEmpty) return const SizedBox.shrink();
-    final scheme = Theme.of(context).colorScheme;
     return Padding(
-      padding: const EdgeInsets.fromLTRB(14, 11, 14, 11),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  label,
-                  style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                    color: scheme.onSurfaceVariant,
-                    fontWeight: FontWeight.w600,
-                    fontSize: 12,
-                  ),
-                ),
-              ),
-              if (onCopy != null) _cupertinoCopyButton(onCopy),
-            ],
-          ),
-          const SizedBox(height: 4),
-          Text(
-            value,
-            style: _dataValueStyle(
-              context,
-              monospace: monospace,
-            ).copyWith(fontSize: 14, fontWeight: FontWeight.w600, height: 1.45),
-          ),
-        ],
+      padding: const EdgeInsets.fromLTRB(
+        _sheetContentHorizontalPadding,
+        10,
+        _sheetContentHorizontalPadding,
+        10,
+      ),
+      child: _buildGroupedRowContent(
+        label: label,
+        value: value,
+        monospace: monospace,
+        onCopy: onCopy,
       ),
     );
   }
@@ -1960,7 +2191,7 @@ class _QbTorrentDetailSheetState extends State<QbTorrentDetailSheet> {
         child: CupertinoButton(
           color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.12),
           borderRadius: BorderRadius.circular(12),
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
           onPressed: () {
             Clipboard.setData(ClipboardData(text: magnetUri));
             showToast(message: '已复制 Magnet 链接');
@@ -2124,7 +2355,12 @@ class _QbTorrentDetailSheetState extends State<QbTorrentDetailSheet> {
         message != tracker.statusText;
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(12, 10, 8, 10),
+      padding: const EdgeInsets.fromLTRB(
+        _sheetContentHorizontalPadding,
+        10,
+        _sheetContentHorizontalPadding,
+        10,
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -2298,7 +2534,12 @@ class _QbTorrentDetailSheetState extends State<QbTorrentDetailSheet> {
         : scheme.primary;
     final completedSize = (file.size * file.progress).round();
     return Padding(
-      padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+      padding: const EdgeInsets.fromLTRB(
+        _sheetContentHorizontalPadding,
+        10,
+        _sheetContentHorizontalPadding,
+        10,
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
