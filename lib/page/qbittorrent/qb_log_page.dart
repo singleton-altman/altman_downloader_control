@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:ui';
 import 'package:altman_downloader_control/controller/qbittorrent/qb_controller.dart';
 import 'package:altman_downloader_control/model/qb_log_model.dart';
+import 'package:altman_downloader_control/widget/downloader_app_bar_back_button.dart';
 import 'package:altman_downloader_control/utils/toast_utils.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
@@ -213,6 +214,9 @@ class _QBLogPageState extends State<QBLogPage> {
       floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
       floatingActionButton: _buildFloatingBar(context),
       appBar: AppBar(
+        automaticallyImplyLeading: false,
+        leadingWidth: DownloaderAppBarBackButton.leadingWidth,
+        leading: const DownloaderAppBarBackButton(),
         title: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -694,7 +698,9 @@ class _QBLogPageState extends State<QBLogPage> {
     final textController = TextEditingController(text: _searchKeyword);
     final submitted = await showModalBottomSheet<String>(
       context: context,
+      useRootNavigator: true,
       isScrollControlled: true,
+      useSafeArea: true,
       backgroundColor: Colors.transparent,
       builder: (ctx) {
         final insets = MediaQuery.of(ctx).viewInsets;
@@ -731,7 +737,9 @@ class _QBLogPageState extends State<QBLogPage> {
   Future<void> _openFilterSheet() async {
     await showModalBottomSheet<void>(
       context: context,
+      useRootNavigator: true,
       isScrollControlled: true,
+      useSafeArea: true,
       backgroundColor: Colors.transparent,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setModalState) {

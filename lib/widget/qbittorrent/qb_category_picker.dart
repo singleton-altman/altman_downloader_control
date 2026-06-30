@@ -10,7 +10,9 @@ Future<String?> showQBCategoryPicker(
 ) async {
   return await showModalBottomSheet<String>(
     context: context,
+    useRootNavigator: true,
     isScrollControlled: true,
+    useSafeArea: true,
     backgroundColor: Colors.transparent,
     builder: (context) => QBCategoryPicker(controller: controller),
   );

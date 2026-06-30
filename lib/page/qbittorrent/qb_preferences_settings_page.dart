@@ -3,6 +3,7 @@ import 'package:altman_downloader_control/controller/protocol.dart';
 import 'package:altman_downloader_control/model/qb_preferences_model.dart';
 import 'package:altman_downloader_control/utils/string_utils.dart';
 import 'package:altman_downloader_control/utils/toast_utils.dart';
+import 'package:altman_downloader_control/widget/downloader_app_bar_back_button.dart';
 import 'package:altman_downloader_control/widget/label_switch_form.dart';
 import 'package:altman_downloader_control/widget/lable_textfield_form.dart';
 import 'package:flutter/cupertino.dart';
@@ -1084,6 +1085,9 @@ class _QBPreferencesSettingsScreenState
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+        automaticallyImplyLeading: false,
+        leadingWidth: DownloaderAppBarBackButton.leadingWidth,
+        leading: const DownloaderAppBarBackButton(),
         title: const Text('qBittorrent 设置'),
         actions: [
           IconButton(

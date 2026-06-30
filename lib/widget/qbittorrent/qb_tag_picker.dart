@@ -12,7 +12,9 @@ Future<List<String>?> showQBTagPicker(
 }) async {
   return await showModalBottomSheet<List<String>>(
     context: context,
+    useRootNavigator: true,
     isScrollControlled: true,
+    useSafeArea: true,
     backgroundColor: Colors.transparent,
     builder: (context) => QBTagPicker(
       initialSelectedTags: initialSelectedTags,

@@ -162,9 +162,10 @@ class _QbTorrentDetailSheetState extends State<QbTorrentDetailSheet> {
   @override
   Widget build(BuildContext context) {
     return DraggableScrollableSheet(
-      initialChildSize: 0.9,
-      minChildSize: 0.5,
-      maxChildSize: 0.99,
+      initialChildSize: 0.92,
+      minChildSize: 0.36,
+      maxChildSize: 1,
+      expand: false,
       builder: (context, scrollController) {
         final bottomSafe = MediaQuery.paddingOf(context).bottom;
         final contentBottomPad = bottomSafe + _floatingTabBarHeight + 24;
@@ -856,20 +857,13 @@ class _QbTorrentDetailSheetState extends State<QbTorrentDetailSheet> {
     return _buildSheetPageShell(child: child);
   }
 
-  String _headerTitleText(String fullName) {
-    final trimmed = fullName.trim();
-    if (trimmed.isEmpty) return fullName;
-    final first = trimmed.split('.').first.trim();
-    return first.isNotEmpty ? first : trimmed;
-  }
-
   Widget _buildTorrentHeader(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final accent = _statusAccentColor(scheme);
     final fullTitle = _properties?.name.isNotEmpty == true
         ? _properties!.name
         : widget.name;
-    final title = _headerTitleText(fullTitle);
+    final title = fullTitle.trim().isEmpty ? widget.name : fullTitle.trim();
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final subtle = scheme.onSurfaceVariant.withValues(alpha: 0.88);
     return Column(
@@ -877,16 +871,16 @@ class _QbTorrentDetailSheetState extends State<QbTorrentDetailSheet> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Expanded(
               child: Text(
                 title,
-                maxLines: 1,
+                maxLines: 2,
                 overflow: TextOverflow.ellipsis,
-                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                  fontWeight: FontWeight.w600,
-                  height: 1.15,
+                style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.w800,
+                  height: 1.18,
                   letterSpacing: -0.2,
                 ),
               ),
@@ -894,18 +888,37 @@ class _QbTorrentDetailSheetState extends State<QbTorrentDetailSheet> {
             _buildSheetCloseButton(context),
           ],
         ),
-        const SizedBox(height: 4),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 6,
+          runSpacing: 6,
+          children: [
+            _buildHeaderMetaChip(
+              context,
+              icon: Icons.signal_cellular_alt_rounded,
+              text: _statusText(),
+              color: accent,
+            ),
+            _buildHeaderMetaChip(
+              context,
+              icon: Icons.storage_outlined,
+              text: _sizeText(),
+              color: scheme.onSurfaceVariant,
+            ),
+            _buildHeaderMetaChip(
+              context,
+              icon: Icons.schedule_outlined,
+              text: _addedTimeText(),
+              color: scheme.secondary,
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
         Row(
           children: [
-            Container(
-              width: 6,
-              height: 6,
-              decoration: BoxDecoration(color: accent, shape: BoxShape.circle),
-            ),
-            const SizedBox(width: 6),
             Expanded(
               child: Text(
-                _statusText(),
+                '进度',
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: Theme.of(context).textTheme.labelSmall?.copyWith(
@@ -942,6 +955,47 @@ class _QbTorrentDetailSheetState extends State<QbTorrentDetailSheet> {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildHeaderMetaChip(
+    BuildContext context, {
+    required IconData icon,
+    required String text,
+    required Color color,
+  }) {
+    final scheme = Theme.of(context).colorScheme;
+    return Container(
+      constraints: const BoxConstraints(maxWidth: 210),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color.withValues(alpha: 0.16), width: 0.5),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 12, color: color),
+          const SizedBox(width: 5),
+          Flexible(
+            child: Text(
+              text,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                color: color == scheme.onSurfaceVariant
+                    ? scheme.onSurfaceVariant
+                    : color,
+                fontWeight: FontWeight.w700,
+                fontSize: 11,
+                height: 1,
+                letterSpacing: 0,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -1075,15 +1129,6 @@ class _QbTorrentDetailSheetState extends State<QbTorrentDetailSheet> {
     );
   }
 
-  TextStyle? _dataLabelStyle(BuildContext context) {
-    return Theme.of(context).textTheme.bodyMedium?.copyWith(
-      color: Theme.of(context).colorScheme.onSurfaceVariant,
-      fontSize: 13,
-      fontWeight: FontWeight.w500,
-      height: 1.35,
-    );
-  }
-
   TextStyle _dataValueStyle(
     BuildContext context, {
     bool monospace = false,
@@ -1137,175 +1182,6 @@ class _QbTorrentDetailSheetState extends State<QbTorrentDetailSheet> {
 
   Widget _buildSectionHeader(String title, {String? subtitle}) {
     return _buildBlockTitle(title, subtitle: subtitle);
-  }
-
-  Widget _buildDataTable(List<Widget> rows) {
-    if (rows.isEmpty) return const SizedBox.shrink();
-    final scheme = Theme.of(context).colorScheme;
-    return Container(
-      width: double.infinity,
-      decoration: _insetCardDecoration(context, radius: 12),
-      clipBehavior: Clip.antiAlias,
-      child: Column(
-        children: [
-          for (var i = 0; i < rows.length; i++) ...[
-            rows[i],
-            if (i < rows.length - 1)
-              Divider(
-                height: 1,
-                thickness: 0.5,
-                indent: 14,
-                endIndent: 14,
-                color: scheme.outlineVariant.withValues(alpha: 0.35),
-              ),
-          ],
-        ],
-      ),
-    );
-  }
-
-  Widget _buildDataRow(
-    String label,
-    String value, {
-    bool monospace = false,
-    bool emphasizeValue = false,
-    bool alignValueEnd = false,
-    int maxLines = 1,
-    VoidCallback? onCopy,
-  }) {
-    final scheme = Theme.of(context).colorScheme;
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 96,
-            child: Text(label, style: _dataLabelStyle(context)),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: SelectableText(
-              value,
-              maxLines: maxLines,
-              textAlign: alignValueEnd ? TextAlign.end : TextAlign.start,
-              style: _dataValueStyle(
-                context,
-                monospace: monospace,
-                emphasize: emphasizeValue,
-              ),
-            ),
-          ),
-          if (onCopy != null) _cupertinoCopyButton(onCopy),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildDataBlock({required String title, required List<Widget> rows}) {
-    if (rows.isEmpty) return const SizedBox.shrink();
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 18),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _buildBlockTitle(title),
-          const SizedBox(height: 8),
-          _buildDataTable(rows),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildMetricsBlock({
-    required String title,
-    required List<_DetailMetricItem> items,
-  }) {
-    if (items.isEmpty) return const SizedBox.shrink();
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 18),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _buildBlockTitle(title),
-          const SizedBox(height: 8),
-          LayoutBuilder(
-            builder: (context, constraints) {
-              final columns = constraints.maxWidth >= 560 ? 3 : 2;
-              const gap = 6.0;
-              final width =
-                  (constraints.maxWidth - gap * (columns - 1)) / columns;
-              return Wrap(
-                spacing: gap,
-                runSpacing: gap,
-                children: [
-                  for (final item in items)
-                    SizedBox(
-                      width: width,
-                      child: _buildMetricCard(context, item),
-                    ),
-                ],
-              );
-            },
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildMetricCard(BuildContext context, _DetailMetricItem item) {
-    final scheme = Theme.of(context).colorScheme;
-    final color = item.color ?? scheme.primary;
-    return Container(
-      constraints: const BoxConstraints(minHeight: 50),
-      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 8),
-      decoration: _insetCardDecoration(context, radius: 12),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          Container(
-            width: 24,
-            height: 24,
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Icon(item.icon, size: 14, color: color),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  item.value,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: _dataValueStyle(
-                    context,
-                    emphasize: true,
-                  ).copyWith(fontSize: 13.5, height: 1.05),
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  item.label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                    color: scheme.onSurfaceVariant,
-                    fontWeight: FontWeight.w700,
-                    fontSize: 10.5,
-                    height: 1,
-                    letterSpacing: 0,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
   }
 
   List<Widget> _buildMetaSectionChildren(
@@ -1627,40 +1503,6 @@ class _QbTorrentDetailSheetState extends State<QbTorrentDetailSheet> {
     ];
   }
 
-  Widget _buildMetaChip({
-    required BuildContext context,
-    required IconData icon,
-    required String text,
-    required Color color,
-  }) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: color.withValues(alpha: 0.18), width: 0.6),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 12, color: color),
-          const SizedBox(width: 4),
-          Text(
-            text,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: Theme.of(context).textTheme.labelSmall?.copyWith(
-              color: color,
-              fontWeight: FontWeight.w600,
-              fontSize: 11,
-              height: 1.1,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildLiveSpeedStrip(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     return _buildMetricTileWrap(
@@ -1734,7 +1576,11 @@ class _QbTorrentDetailSheetState extends State<QbTorrentDetailSheet> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return LayoutBuilder(
       builder: (context, constraints) {
-        final columns = constraints.maxWidth >= 520 ? 3 : 2;
+        final columns = constraints.maxWidth >= 560
+            ? 3
+            : constraints.maxWidth >= 340
+            ? 2
+            : 1;
         const gap = 8.0;
         final width = (constraints.maxWidth - gap * (columns - 1)) / columns;
         return Wrap(
@@ -2125,28 +1971,6 @@ class _QbTorrentDetailSheetState extends State<QbTorrentDetailSheet> {
         value: value,
         monospace: monospace,
         onCopy: onCopy,
-      ),
-    );
-  }
-
-  Widget _buildStatusBadge(BuildContext context, String text, Color color) {
-    return Container(
-      constraints: const BoxConstraints(maxWidth: 110),
-      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: color.withValues(alpha: 0.22), width: 0.7),
-      ),
-      child: Text(
-        text,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        style: Theme.of(context).textTheme.labelSmall?.copyWith(
-          color: color,
-          fontWeight: FontWeight.w800,
-          letterSpacing: 0,
-        ),
       ),
     );
   }
@@ -2958,6 +2782,7 @@ void showTorrentDetailSheet(
 }) {
   showModalBottomSheet(
     context: context,
+    useRootNavigator: true,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
     useSafeArea: true,

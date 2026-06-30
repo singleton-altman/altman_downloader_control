@@ -1,40 +1,46 @@
 import 'package:altman_downloader_control/controller/qbittorrent/qb_controller.dart';
 import 'package:altman_downloader_control/model/qb_rss_item_model.dart';
 import 'package:altman_downloader_control/page/qbittorrent/qb_rss_item_detail_sheet.dart';
+import 'package:altman_downloader_control/theme/downloader_cupertino_theme.dart';
 import 'package:altman_downloader_control/utils/toast_utils.dart';
-import 'package:altman_downloader_control/widget/header.dart';
+import 'package:altman_downloader_control/widget/downloader_app_bar_back_button.dart';
 import 'package:altman_downloader_control/widget/input_dialog.dart'
     hide showMSInputDialog;
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
-/// qBittorrent RSS 列表页面
-/// 使用 ExpansionTile 显示 RSS feeds 和 items
 class QBRssListPage extends StatefulWidget {
-  final QBController controller;
+  const QBRssListPage({
+    super.key,
+    required this.controller,
+    this.embedded = false,
+  });
 
-  const QBRssListPage({super.key, required this.controller});
+  final QBController controller;
+  final bool embedded;
 
   @override
   State<QBRssListPage> createState() => _QBRssListPageState();
 }
 
 class _QBRssListPageState extends State<QBRssListPage> {
-  // 存储每个 RSS Feed 的展开状态
   final Map<String, bool> _expandedStates = {};
+
+  Color get _groupedBg => CupertinoDynamicColor.resolve(
+    CupertinoColors.systemGroupedBackground,
+    context,
+  );
 
   @override
   void initState() {
     super.initState();
-    // 初始化时加载 RSS 数据
     WidgetsBinding.instance.addPostFrameCallback((_) {
       widget.controller.refreshRssItems();
     });
   }
 
-  bool _isExpanded(String feedPath) {
-    return _expandedStates[feedPath] ?? false;
-  }
+  bool _isExpanded(String feedPath) => _expandedStates[feedPath] ?? false;
 
   void _toggleExpanded(String feedPath) {
     setState(() {
@@ -42,618 +48,959 @@ class _QBRssListPageState extends State<QBRssListPage> {
     });
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Row(
-          children: [
-            Icon(
-              Icons.rss_feed,
-              size: 20,
-              color: Theme.of(context).colorScheme.primary,
-            ),
-            const SizedBox(width: 8),
-            const Text('RSS 订阅'),
-          ],
-        ),
-        actions: [
-          Obx(
-            () => widget.controller.isLoadingRss.value
-                ? const Padding(
-                    padding: EdgeInsets.all(16.0),
-                    child: SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    ),
-                  )
-                : IconButton(
-                    icon: const Icon(Icons.refresh),
-                    onPressed: () {
-                      widget.controller.refreshRssItems();
-                    },
-                    tooltip: '刷新',
+  TextStyle _sectionHeaderStyle(BuildContext context) {
+    return Theme.of(context).textTheme.titleMedium!.copyWith(
+      fontSize: 20,
+      fontWeight: FontWeight.w700,
+      letterSpacing: -0.3,
+    );
+  }
+
+  Widget _leadingBadge(IconData icon, Color color) {
+    return Container(
+      width: 30,
+      height: 30,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.16),
+        borderRadius: BorderRadius.circular(7),
+      ),
+      child: Icon(icon, size: 17, color: color),
+    );
+  }
+
+  Future<void> _onRefresh() async {
+    await widget.controller.refreshRssItems();
+  }
+
+  Widget _buildToolbarActions({bool compact = false}) {
+    return Obx(() {
+      final loading = widget.controller.isLoadingRss.value;
+      return Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          CupertinoButton(
+            padding: EdgeInsets.zero,
+            minimumSize: Size(compact ? 36 : 44, compact ? 36 : 44),
+            onPressed: loading ? null : _onRefresh,
+            child: loading
+                ? const CupertinoActivityIndicator(radius: 9)
+                : Icon(
+                    CupertinoIcons.arrow_clockwise,
+                    size: compact ? 22 : 24,
+                    color: DownloaderCupertinoTheme.primaryBlue,
                   ),
           ),
-          IconButton(
-            icon: const Icon(Icons.add),
+          CupertinoButton(
+            padding: EdgeInsets.zero,
+            minimumSize: Size(compact ? 36 : 44, compact ? 36 : 44),
             onPressed: _showAddRssFeedDialog,
-            tooltip: '添加订阅',
+            child: Icon(
+              CupertinoIcons.add,
+              size: compact ? 22 : 24,
+              color: DownloaderCupertinoTheme.primaryBlue,
+            ),
+          ),
+        ],
+      );
+    });
+  }
+
+  Widget _buildEmbeddedHeader() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 8, 8, 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Expanded(
+            child: Text(
+              'RSS',
+              style: TextStyle(
+                fontSize: 34,
+                fontWeight: FontWeight.w700,
+                letterSpacing: -0.5,
+                color: CupertinoColors.label.resolveFrom(context),
+              ),
+            ),
+          ),
+          _buildToolbarActions(compact: true),
+        ],
+      ),
+    );
+  }
+
+  PreferredSizeWidget? _buildAppBar() {
+    if (widget.embedded) return null;
+    return AppBar(
+      backgroundColor: _groupedBg,
+      surfaceTintColor: Colors.transparent,
+      automaticallyImplyLeading: false,
+      leadingWidth: DownloaderAppBarBackButton.leadingWidth,
+      leading: const DownloaderAppBarBackButton(),
+      title: const Text('RSS'),
+      actions: [
+        Padding(
+          padding: const EdgeInsetsDirectional.only(end: 4),
+          child: _buildToolbarActions(),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildCenterState({
+    required IconData icon,
+    required String title,
+    String? subtitle,
+    Widget? action,
+    Color? iconColor,
+  }) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              icon,
+              size: 56,
+              color:
+                  iconColor ??
+                  CupertinoColors.secondaryLabel.resolveFrom(context),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              title,
+              style: TextStyle(
+                fontSize: 17,
+                fontWeight: FontWeight.w600,
+                color: CupertinoColors.label.resolveFrom(context),
+              ),
+              textAlign: TextAlign.center,
+            ),
+            if (subtitle != null) ...[
+              const SizedBox(height: 8),
+              Text(
+                subtitle,
+                style: TextStyle(
+                  fontSize: 15,
+                  color: CupertinoColors.secondaryLabel.resolveFrom(context),
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ],
+            if (action != null) ...[const SizedBox(height: 20), action],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBodyContent() {
+    final feeds = widget.controller.rssFeeds;
+    final isLoading = widget.controller.isLoadingRss.value;
+    final errorMessage = widget.controller.rssErrorMessage.value;
+
+    if (!widget.controller.isConnected.value) {
+      return _buildCenterState(
+        icon: CupertinoIcons.wifi_slash,
+        title: '未连接到 qBittorrent',
+      );
+    }
+
+    if (errorMessage.isNotEmpty) {
+      return _buildCenterState(
+        icon: CupertinoIcons.exclamationmark_circle,
+        title: errorMessage,
+        iconColor: DownloaderCupertinoTheme.dangerRed,
+        action: CupertinoButton.filled(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+          onPressed: _onRefresh,
+          child: const Text('重试'),
+        ),
+      );
+    }
+
+    if (isLoading && feeds.isEmpty) {
+      return const Center(child: CupertinoActivityIndicator(radius: 14));
+    }
+
+    if (!isLoading && feeds.isEmpty) {
+      return _buildCenterState(
+        icon: Icons.rss_feed_outlined,
+        title: '暂无 RSS 订阅',
+        action: CupertinoButton.filled(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+          onPressed: _showAddRssFeedDialog,
+          child: const Text('添加订阅'),
+        ),
+      );
+    }
+
+    final feedList = feeds.entries.toList();
+    return CustomScrollView(
+      physics: const AlwaysScrollableScrollPhysics(
+        parent: BouncingScrollPhysics(),
+      ),
+      slivers: [
+        CupertinoSliverRefreshControl(onRefresh: _onRefresh),
+        if (widget.embedded) SliverToBoxAdapter(child: _buildEmbeddedHeader()),
+        SliverToBoxAdapter(child: _buildRssOverview(feedList)),
+        SliverPadding(
+          padding: EdgeInsets.only(
+            top: widget.embedded ? 4 : 8,
+            bottom: widget.embedded
+                ? DownloaderCupertinoTheme.shellTabBarHeight + 12
+                : 16,
+          ),
+          sliver: SliverList(
+            delegate: SliverChildBuilderDelegate((context, index) {
+              final entry = feedList[index];
+              return _buildRssFeedSection(entry.key, entry.value);
+            }, childCount: feedList.length),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildRssOverview(List<MapEntry<String, QBRssFeedModel>> feeds) {
+    final unreadCount = feeds.fold<int>(
+      0,
+      (sum, entry) =>
+          sum +
+          (entry.value.getItems() ?? []).where((i) => i.isRead != true).length,
+    );
+    final itemCount = feeds.fold<int>(
+      0,
+      (sum, entry) =>
+          sum +
+          (entry.value.articleCount ?? entry.value.getItems()?.length ?? 0),
+    );
+    final torrentCount = feeds.fold<int>(
+      0,
+      (sum, entry) =>
+          sum +
+          (entry.value.getItems() ?? [])
+              .where((i) => i.torrentURL?.isNotEmpty == true)
+              .length,
+    );
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+      child: Row(
+        children: [
+          Expanded(
+            child: _buildOverviewTile(
+              icon: Icons.rss_feed_rounded,
+              label: '订阅',
+              value: '${feeds.length}',
+              color: DownloaderCupertinoTheme.ratioGold,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: _buildOverviewTile(
+              icon: CupertinoIcons.circle_fill,
+              label: '未读',
+              value: '$unreadCount',
+              color: DownloaderCupertinoTheme.primaryBlue,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: _buildOverviewTile(
+              icon: CupertinoIcons.arrow_down_doc,
+              label: '种子',
+              value: '$torrentCount/$itemCount',
+              color: DownloaderCupertinoTheme.signalTeal,
+            ),
           ),
         ],
       ),
-      body: Obx(() {
-        final feeds = widget.controller.rssFeeds;
-        final isLoading = widget.controller.isLoadingRss.value;
-        final errorMessage = widget.controller.rssErrorMessage.value;
+    );
+  }
 
-        // 如果未连接，显示提示
-        if (!widget.controller.isConnected.value) {
-          return Center(
+  Widget _buildOverviewTile({
+    required IconData icon,
+    required String label,
+    required String value,
+    required Color color,
+  }) {
+    final fill = CupertinoColors.secondarySystemGroupedBackground.resolveFrom(
+      context,
+    );
+    final labelColor = CupertinoColors.secondaryLabel.resolveFrom(context);
+    final textColor = CupertinoColors.label.resolveFrom(context);
+    return Container(
+      constraints: const BoxConstraints(minHeight: 58),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+      decoration: BoxDecoration(
+        color: fill,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: CupertinoColors.separator
+              .resolveFrom(context)
+              .withValues(alpha: 0.45),
+          width: 0.5,
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 26,
+            height: 26,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.13),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(icon, size: 14, color: color),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
             child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(
-                  Icons.wifi_off,
-                  size: 64,
-                  color: Theme.of(
-                    context,
-                  ).colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
-                ),
-                const SizedBox(height: 16),
                 Text(
-                  '未连接到 qBittorrent',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    color: Theme.of(
-                      context,
-                    ).colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
+                  value,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    height: 1,
+                    color: textColor,
+                  ),
+                ),
+                const SizedBox(height: 5),
+                Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    height: 1,
+                    color: labelColor,
                   ),
                 ),
               ],
             ),
-          );
-        }
+          ),
+        ],
+      ),
+    );
+  }
 
-        // 错误信息
-        if (errorMessage.isNotEmpty) {
-          return Center(
-            child: Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
+  List<Widget> _feedContextMenuActions(String feedPath, String title) {
+    return [
+      CupertinoContextMenuAction(
+        onPressed: () => _showRenameFeedDialog(feedPath, title),
+        trailingIcon: CupertinoIcons.pencil,
+        child: const Text('重命名'),
+      ),
+      CupertinoContextMenuAction(
+        onPressed: () => widget.controller.refreshRssFeed(feedPath),
+        trailingIcon: CupertinoIcons.arrow_clockwise,
+        child: const Text('刷新'),
+      ),
+      CupertinoContextMenuAction(
+        isDestructiveAction: true,
+        onPressed: () => _showRemoveFeedConfirm(feedPath, title),
+        trailingIcon: CupertinoIcons.delete,
+        child: const Text('删除'),
+      ),
+    ];
+  }
+
+  Widget _buildCollapsedPreview(QBRssItemModel item) {
+    final isRead = item.isRead == true;
+    final tertiary = CupertinoColors.tertiaryLabel.resolveFrom(context);
+    final hasTorrent = item.torrentURL?.isNotEmpty == true;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(10, 9, 10, 10),
+      decoration: BoxDecoration(
+        color: CupertinoColors.secondarySystemGroupedBackground.resolveFrom(
+          context,
+        ),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: CupertinoColors.separator
+              .resolveFrom(context)
+              .withValues(alpha: 0.35),
+          width: 0.5,
+        ),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 6,
+            height: 6,
+            margin: const EdgeInsets.only(top: 6),
+            decoration: BoxDecoration(
+              color: isRead
+                  ? CupertinoColors.systemGrey3.resolveFrom(context)
+                  : DownloaderCupertinoTheme.primaryBlue,
+              shape: BoxShape.circle,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (item.date != null) ...[
+                  Row(
+                    children: [
+                      Icon(CupertinoIcons.time, size: 12, color: tertiary),
+                      const SizedBox(width: 4),
+                      Expanded(
+                        child: Text(
+                          item.date!,
+                          style: TextStyle(fontSize: 12, color: tertiary),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      if (hasTorrent)
+                        _buildItemBadge(
+                          '种子',
+                          DownloaderCupertinoTheme.signalTeal,
+                          dense: true,
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                ],
+                Text(
+                  item.title ?? '无标题',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: isRead ? FontWeight.w400 : FontWeight.w500,
+                    height: 1.35,
+                    color: isRead
+                        ? CupertinoColors.secondaryLabel.resolveFrom(context)
+                        : CupertinoColors.label.resolveFrom(context),
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFeedTitleRow({
+    required String title,
+    required int itemCount,
+    required TextStyle titleStyle,
+  }) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        _buildItemBadge(
+          itemCount > 0 ? '$itemCount 条' : '暂无',
+          itemCount > 0
+              ? DownloaderCupertinoTheme.primaryBlue
+              : CupertinoColors.systemGrey.resolveFrom(context),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            title,
+            style: titleStyle,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _contextMenuChild(Widget child) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final width = constraints.maxWidth.isFinite
+            ? constraints.maxWidth
+            : MediaQuery.sizeOf(context).width - 32;
+        return SizedBox(width: width, child: child);
+      },
+    );
+  }
+
+  Widget _buildCollapsedFeedTile({
+    required String feedPath,
+    required String title,
+    required int itemCount,
+    required int unreadCount,
+    required QBRssItemModel? latestItem,
+  }) {
+    final fill = CupertinoColors.secondarySystemGroupedBackground.resolveFrom(
+      context,
+    );
+    final separator = CupertinoColors.separator.resolveFrom(context);
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () => _toggleExpanded(feedPath),
+        child: Container(
+          color: fill,
+          padding: const EdgeInsets.fromLTRB(14, 14, 10, 14),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Icon(
-                    Icons.error_outline,
-                    size: 64,
-                    color: Theme.of(context).colorScheme.error,
+                  _leadingBadge(
+                    Icons.rss_feed,
+                    DownloaderCupertinoTheme.ratioGold,
                   ),
-                  const SizedBox(height: 16),
-                  Text(
-                    errorMessage,
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: Theme.of(context).colorScheme.error,
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildFeedTitleRow(
+                          title: title,
+                          itemCount: itemCount,
+                          titleStyle: const TextStyle(
+                            fontSize: 17,
+                            fontWeight: FontWeight.w600,
+                            letterSpacing: -0.2,
+                            height: 1.2,
+                          ),
+                        ),
+                        if (unreadCount > 0) ...[
+                          const SizedBox(height: 6),
+                          Row(
+                            children: [
+                              _buildItemBadge(
+                                '$unreadCount 条未读',
+                                DownloaderCupertinoTheme.primaryBlue,
+                                dense: true,
+                              ),
+                              const SizedBox(width: 6),
+                              Expanded(
+                                child: Container(
+                                  height: 1,
+                                  color: separator.withValues(alpha: 0.34),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ],
                     ),
-                    textAlign: TextAlign.center,
                   ),
-                  const SizedBox(height: 16),
-                  ElevatedButton.icon(
-                    onPressed: () {
-                      widget.controller.refreshRssItems();
-                    },
-                    icon: const Icon(Icons.refresh),
-                    label: const Text('重试'),
+                  Padding(
+                    padding: const EdgeInsets.only(top: 2),
+                    child: Icon(
+                      CupertinoIcons.chevron_down,
+                      size: 16,
+                      color: CupertinoColors.tertiaryLabel.resolveFrom(context),
+                    ),
                   ),
                 ],
               ),
-            ),
-          );
-        }
-
-        // 加载状态
-        if (isLoading && feeds.isEmpty) {
-          return const Center(child: CircularProgressIndicator());
-        }
-
-        // 空状态
-        if (!isLoading && feeds.isEmpty) {
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  Icons.rss_feed_outlined,
-                  size: 64,
-                  color: Theme.of(
-                    context,
-                  ).colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  '暂无 RSS 订阅',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    color: Theme.of(
-                      context,
-                    ).colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                ElevatedButton.icon(
-                  onPressed: _showAddRssFeedDialog,
-                  icon: const Icon(Icons.add),
-                  label: const Text('添加 RSS 订阅'),
-                ),
+              if (latestItem != null) ...[
+                const SizedBox(height: 12),
+                _buildCollapsedPreview(latestItem),
               ],
-            ),
-          );
-        }
-
-        // RSS Feeds 列表 - 使用 ListView.builder 优化性能
-        final feedList = feeds.entries.toList();
-        return ListView.builder(
-          padding: const EdgeInsets.all(8),
-          itemCount: feedList.length,
-          itemBuilder: (context, index) {
-            // RSS Feed item
-            final feedEntry = feedList[index];
-            final feedPath = feedEntry.key;
-            final feed = feedEntry.value;
-
-            return _buildRssFeedItem(feedPath, feed);
-          },
-        );
-      }),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
-  /// 构建 RSS Feed Item
-  Widget _buildRssFeedItem(String feedPath, QBRssFeedModel feed) {
-    final displayItems = feed.getItems() ?? [];
-    final itemCount = feed.articleCount ?? displayItems.length;
-    final isExpanded = _isExpanded(feedPath);
-
-    return Card(
-      margin: const EdgeInsets.only(bottom: 8),
-      elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: BorderSide(
-          color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.1),
-          width: 1,
-        ),
-      ),
-      child: Column(
+  Widget _buildExpandedFeedHeader({
+    required String feedPath,
+    required String title,
+    required int itemCount,
+    required int unreadCount,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(14, 14, 4, 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // RSS Feed Header - 使用 MSDefaultHeader
-          InkWell(
-            onTap: () => _toggleExpanded(feedPath),
-            borderRadius: const BorderRadius.only(
-              topLeft: Radius.circular(12),
-              topRight: Radius.circular(12),
-            ),
+          _leadingBadge(Icons.rss_feed, DownloaderCupertinoTheme.ratioGold),
+          const SizedBox(width: 12),
+          Expanded(
             child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                MSDefaultHeader(
-                  title: feed.title ?? feedPath,
-                  subTitle: itemCount > 0 ? '$itemCount 条' : null,
-                  useSectionStyle: true,
-                  showLeadingAccent: true,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 12,
-                  ),
-                  titleStyle: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w600,
-                    fontSize: 15,
-                    color: Theme.of(context).colorScheme.onSurface,
-                  ),
-                  withBackground: true,
-                  showBottomDivider: false,
+                _buildFeedTitleRow(
+                  title: title,
+                  itemCount: itemCount,
+                  titleStyle: _sectionHeaderStyle(
+                    context,
+                  ).copyWith(fontSize: 18),
                 ),
-                // Feed URL 和操作按钮
-                if (feed.url != null)
-                  Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 8,
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(
-                          Icons.link,
-                          size: 14,
-                          color: Theme.of(
-                            context,
-                          ).colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            feed.url!,
-                            style: Theme.of(context).textTheme.bodySmall
-                                ?.copyWith(
-                                  color: Theme.of(context)
-                                      .colorScheme
-                                      .onSurfaceVariant
-                                      .withValues(alpha: 0.7),
-                                  fontSize: 12,
-                                ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                        // 展开/收起图标
-                        Icon(
-                          isExpanded ? Icons.expand_less : Icons.expand_more,
-                          size: 20,
-                          color: Theme.of(
-                            context,
-                          ).colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
-                        ),
-                        const SizedBox(width: 8),
-                        // 操作菜单
-                        PopupMenuButton<String>(
-                          icon: const Icon(Icons.more_vert, size: 20),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          onSelected: (value) {
-                            switch (value) {
-                              case 'rename':
-                                _showRenameFeedDialog(
-                                  feedPath,
-                                  feed.title ?? feedPath,
-                                );
-                                break;
-                              case 'refresh':
-                                widget.controller.refreshRssFeed(feedPath);
-                                break;
-                              case 'remove':
-                                _showRemoveFeedConfirm(
-                                  feedPath,
-                                  feed.title ?? feedPath,
-                                );
-                                break;
-                            }
-                          },
-                          itemBuilder: (context) => [
-                            const PopupMenuItem(
-                              value: 'rename',
-                              child: Row(
-                                children: [
-                                  Icon(Icons.edit, size: 18),
-                                  SizedBox(width: 8),
-                                  Text('重命名'),
-                                ],
-                              ),
-                            ),
-                            const PopupMenuItem(
-                              value: 'refresh',
-                              child: Row(
-                                children: [
-                                  Icon(Icons.refresh, size: 18),
-                                  SizedBox(width: 8),
-                                  Text('刷新'),
-                                ],
-                              ),
-                            ),
-                            const PopupMenuItem(
-                              value: 'remove',
-                              child: Row(
-                                children: [
-                                  Icon(
-                                    Icons.delete,
-                                    size: 18,
-                                    color: Colors.red,
-                                  ),
-                                  SizedBox(width: 8),
-                                  Text(
-                                    '删除',
-                                    style: TextStyle(color: Colors.red),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  )
-                else
-                  Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 8,
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        // 展开/收起图标
-                        IconButton(
-                          icon: Icon(
-                            isExpanded ? Icons.expand_less : Icons.expand_more,
-                            size: 20,
-                          ),
-                          onPressed: () => _toggleExpanded(feedPath),
-                          tooltip: isExpanded ? '收起' : '展开',
-                        ),
-                        // 操作菜单
-                        PopupMenuButton<String>(
-                          icon: const Icon(Icons.more_vert, size: 20),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          onSelected: (value) {
-                            switch (value) {
-                              case 'rename':
-                                _showRenameFeedDialog(
-                                  feedPath,
-                                  feed.title ?? feedPath,
-                                );
-                                break;
-                              case 'refresh':
-                                widget.controller.refreshRssFeed(feedPath);
-                                break;
-                              case 'remove':
-                                _showRemoveFeedConfirm(
-                                  feedPath,
-                                  feed.title ?? feedPath,
-                                );
-                                break;
-                            }
-                          },
-                          itemBuilder: (context) => [
-                            const PopupMenuItem(
-                              value: 'rename',
-                              child: Row(
-                                children: [
-                                  Icon(Icons.edit, size: 18),
-                                  SizedBox(width: 8),
-                                  Text('重命名'),
-                                ],
-                              ),
-                            ),
-                            const PopupMenuItem(
-                              value: 'refresh',
-                              child: Row(
-                                children: [
-                                  Icon(Icons.refresh, size: 18),
-                                  SizedBox(width: 8),
-                                  Text('刷新'),
-                                ],
-                              ),
-                            ),
-                            const PopupMenuItem(
-                              value: 'remove',
-                              child: Row(
-                                children: [
-                                  Icon(
-                                    Icons.delete,
-                                    size: 18,
-                                    color: Colors.red,
-                                  ),
-                                  SizedBox(width: 8),
-                                  Text(
-                                    '删除',
-                                    style: TextStyle(color: Colors.red),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
+                if (unreadCount > 0) ...[
+                  const SizedBox(height: 6),
+                  _buildItemBadge(
+                    '$unreadCount 条未读',
+                    DownloaderCupertinoTheme.primaryBlue,
                   ),
+                ],
               ],
             ),
           ),
-          // 可展开的内容区域
-          if (isExpanded)
-            Column(
-              children: [
-                // RSS Items 列表 - 使用 MSDefaultHeader 作为分隔
-                if (displayItems.isNotEmpty)
-                  MSDefaultHeader(
-                    title: '内容列表',
-                    subTitle: '$itemCount 条',
-                    useSectionStyle: true,
-                    showBottomDivider: true,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 8,
-                    ),
-                  ),
-                if (displayItems.isEmpty)
-                  Padding(
-                    padding: const EdgeInsets.all(24.0),
-                    child: Center(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            Icons.inbox_outlined,
-                            size: 48,
-                            color: Theme.of(context)
-                                .colorScheme
-                                .onSurfaceVariant
-                                .withValues(alpha: 0.5),
-                          ),
-                          const SizedBox(height: 12),
-                          Text(
-                            '暂无内容',
-                            style: Theme.of(context).textTheme.bodyMedium
-                                ?.copyWith(
-                                  color: Theme.of(context)
-                                      .colorScheme
-                                      .onSurfaceVariant
-                                      .withValues(alpha: 0.7),
-                                ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  )
-                else
-                  ...displayItems.asMap().entries.map((entry) {
-                    final index = entry.key;
-                    final item = entry.value;
-                    return _buildRssItem(
-                      item,
-                      feedPath,
-                      showDivider: index > 0,
-                    );
-                  }),
-              ],
+          CupertinoButton(
+            padding: EdgeInsets.zero,
+            minimumSize: const Size(36, 36),
+            onPressed: () => _toggleExpanded(feedPath),
+            child: Icon(
+              CupertinoIcons.chevron_up,
+              size: 16,
+              color: CupertinoColors.tertiaryLabel.resolveFrom(context),
             ),
+          ),
         ],
       ),
     );
   }
 
-  /// 构建 RSS Item
-  Widget _buildRssItem(
+  Widget _buildRssFeedSection(String feedPath, QBRssFeedModel feed) {
+    final displayItems = feed.getItems() ?? [];
+    final itemCount = feed.articleCount ?? displayItems.length;
+    final isExpanded = _isExpanded(feedPath);
+    final title = feed.title ?? feedPath;
+    final unreadCount = displayItems.where((i) => i.isRead != true).length;
+    final latestItem = displayItems.isNotEmpty ? displayItems.first : null;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Material(
+        color: Colors.transparent,
+        child: CupertinoListSection.insetGrouped(
+          backgroundColor: _groupedBg,
+          children: [
+            if (!isExpanded)
+              CupertinoContextMenu(
+                actions: _feedContextMenuActions(feedPath, title),
+                child: _contextMenuChild(
+                  _buildCollapsedFeedTile(
+                    feedPath: feedPath,
+                    title: title,
+                    itemCount: itemCount,
+                    unreadCount: unreadCount,
+                    latestItem: latestItem,
+                  ),
+                ),
+              )
+            else
+              CupertinoContextMenu(
+                actions: _feedContextMenuActions(feedPath, title),
+                child: _contextMenuChild(
+                  _buildExpandedFeedHeader(
+                    feedPath: feedPath,
+                    title: title,
+                    itemCount: itemCount,
+                    unreadCount: unreadCount,
+                  ),
+                ),
+              ),
+            if (isExpanded) ...[
+              if (feed.url != null)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 4, 16, 10),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _leadingBadge(
+                        CupertinoIcons.link,
+                        DownloaderCupertinoTheme.signalTeal,
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              '订阅地址',
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: CupertinoColors.secondaryLabel
+                                    .resolveFrom(context),
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              feed.url!,
+                              style: TextStyle(
+                                fontSize: 14,
+                                height: 1.35,
+                                color: CupertinoColors.label.resolveFrom(
+                                  context,
+                                ),
+                              ),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              if (displayItems.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                  child: Center(
+                    child: Text(
+                      '暂无内容',
+                      style: TextStyle(
+                        fontSize: 15,
+                        color: CupertinoColors.secondaryLabel.resolveFrom(
+                          context,
+                        ),
+                      ),
+                    ),
+                  ),
+                )
+              else
+                ...displayItems.asMap().entries.map(
+                  (entry) => _buildRssItemRow(
+                    entry.value,
+                    feedPath,
+                    showDivider: entry.key > 0,
+                  ),
+                ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildItemBadge(String label, Color color, {bool dense = false}) {
+    return Container(
+      padding: EdgeInsets.symmetric(
+        horizontal: dense ? 6 : 8,
+        vertical: dense ? 2 : 3,
+      ),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(dense ? 5 : 6),
+        border: Border.all(color: color.withValues(alpha: 0.22), width: 0.5),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontSize: dense ? 10 : 11,
+          fontWeight: FontWeight.w600,
+          color: color,
+          height: 1.1,
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openRssItem(QBRssItemModel item, String feedPath) async {
+    final isRead = item.isRead == true;
+    if (!isRead) {
+      try {
+        await widget.controller.markRssAsRead(itemPath: feedPath);
+      } catch (e) {
+        showToast(message: '标记已读失败: $e');
+      }
+    }
+    if (!mounted) return;
+    showQBRssItemDetailSheet(
+      context,
+      item: item,
+      qbController: widget.controller,
+    );
+  }
+
+  Widget _buildRssItemRow(
     QBRssItemModel item,
     String feedPath, {
-    bool showDivider = false,
+    required bool showDivider,
   }) {
     final isRead = item.isRead == true;
+    final hasTorrent = item.torrentURL?.isNotEmpty == true;
+    final secondary = CupertinoColors.secondaryLabel.resolveFrom(context);
+    final tertiary = CupertinoColors.tertiaryLabel.resolveFrom(context);
+    final label = CupertinoColors.label.resolveFrom(context);
+    final rowFill = isRead
+        ? Colors.transparent
+        : DownloaderCupertinoTheme.primaryBlue.withValues(alpha: 0.035);
 
     return Column(
+      mainAxisSize: MainAxisSize.min,
       children: [
-        // Divider 分割线
         if (showDivider)
           Divider(
             height: 1,
             thickness: 0.5,
             indent: 16,
             endIndent: 16,
-            color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.1),
+            color: CupertinoColors.separator.resolveFrom(context),
           ),
-        // Item 内容
         Material(
           color: Colors.transparent,
           child: InkWell(
-            onTap: () async {
-              // 如果未读，点击后标记为已读
-              if (!isRead) {
-                try {
-                  await widget.controller.markRssAsRead(itemPath: feedPath);
-                } catch (e) {
-                  showToast(message: '标记已读失败: $e');
-                }
-              }
-              if (!mounted) return;
-              // 显示详情页面
-              showQBRssItemDetailSheet(
-                context,
-                item: item,
-                qbController: widget.controller,
-              );
-            },
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              child: Column(
+            onTap: () => _openRssItem(item, feedPath),
+            child: Container(
+              color: rowFill,
+              padding: const EdgeInsets.fromLTRB(14, 12, 10, 12),
+              child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // 发布时间 - 显示在标题顶部
-                  if (item.date != null) ...[
-                    Row(
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Icon(
-                          Icons.access_time,
-                          size: 12,
-                          color: Theme.of(
-                            context,
-                          ).colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
+                        Row(
+                          children: [
+                            if (item.date != null) ...[
+                              Icon(
+                                CupertinoIcons.time,
+                                size: 12,
+                                color: tertiary,
+                              ),
+                              const SizedBox(width: 4),
+                              Expanded(
+                                child: Text(
+                                  item.date!,
+                                  style: TextStyle(
+                                    fontSize: 12.5,
+                                    color: secondary,
+                                    height: 1.1,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ] else
+                              const Spacer(),
+                            if (!isRead)
+                              _buildItemBadge(
+                                '未读',
+                                DownloaderCupertinoTheme.primaryBlue,
+                                dense: true,
+                              ),
+                            if (hasTorrent) ...[
+                              if (!isRead) const SizedBox(width: 6),
+                              _buildItemBadge(
+                                '种子',
+                                DownloaderCupertinoTheme.signalTeal,
+                                dense: true,
+                              ),
+                            ],
+                          ],
                         ),
-                        const SizedBox(width: 4),
+                        const SizedBox(height: 7),
                         Text(
-                          item.date!,
-                          style: Theme.of(context).textTheme.bodySmall
-                              ?.copyWith(
-                                color: Theme.of(context)
-                                    .colorScheme
-                                    .onSurfaceVariant
-                                    .withValues(alpha: 0.6),
-                                fontSize: 11,
-                              ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                  ],
-                  // 标题行：状态指示器 + 标题
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // 状态指示器
-                      Container(
-                        width: 8,
-                        height: 8,
-                        margin: const EdgeInsets.only(top: 6, right: 10),
-                        decoration: BoxDecoration(
-                          color: isRead
-                              ? Theme.of(context).colorScheme.onSurfaceVariant
-                                    .withValues(alpha: 0.5)
-                              : Theme.of(context).colorScheme.primary,
-                          shape: BoxShape.circle,
-                        ),
-                      ),
-                      // 标题
-                      Expanded(
-                        child: Text(
                           item.title ?? '无标题',
-                          style: Theme.of(context).textTheme.bodyMedium
-                              ?.copyWith(
-                                fontWeight: isRead
-                                    ? FontWeight.normal
-                                    : FontWeight.w600,
-                                color: isRead
-                                    ? Theme.of(context)
-                                          .colorScheme
-                                          .onSurfaceVariant
-                                          .withValues(alpha: 0.8)
-                                    : Theme.of(context).colorScheme.onSurface,
-                                fontSize: 14,
-                                height: 1.4,
-                              ),
-                          maxLines: 2,
+                          style: TextStyle(
+                            fontSize: 15.5,
+                            fontWeight: isRead
+                                ? FontWeight.w400
+                                : FontWeight.w700,
+                            height: 1.32,
+                            color: isRead ? secondary : label,
+                          ),
+                          maxLines: 3,
                           overflow: TextOverflow.ellipsis,
                         ),
-                      ),
-                    ],
-                  ),
-                  // 分类标签
-                  if (item.category != null) ...[
-                    const SizedBox(height: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Theme.of(
-                          context,
-                        ).colorScheme.primaryContainer.withValues(alpha: 0.4),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Text(
-                        item.category!,
-                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                          color: Theme.of(context).colorScheme.primary,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
+                        if ((item.author != null && item.author!.isNotEmpty) ||
+                            (item.category != null &&
+                                item.category!.isNotEmpty)) ...[
+                          const SizedBox(height: 8),
+                          Wrap(
+                            spacing: 6,
+                            runSpacing: 5,
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            children: [
+                              if (item.author != null &&
+                                  item.author!.isNotEmpty)
+                                _buildRssMetaText(
+                                  icon: CupertinoIcons.person,
+                                  text: item.author!,
+                                  color: tertiary,
+                                ),
+                              if (item.category != null &&
+                                  item.category!.isNotEmpty)
+                                _buildItemBadge(
+                                  item.category!,
+                                  DownloaderCupertinoTheme.ratioGold,
+                                  dense: true,
+                                ),
+                            ],
+                          ),
+                        ],
+                      ],
                     ),
-                  ],
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.only(left: 8, top: 22),
+                    child: Icon(
+                      CupertinoIcons.chevron_right,
+                      size: 14,
+                      color: tertiary,
+                    ),
+                  ),
                 ],
               ),
             ),
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildRssMetaText({
+    required IconData icon,
+    required String text,
+    required Color color,
+  }) {
+    return ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: 210),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 12, color: color),
+          const SizedBox(width: 4),
+          Flexible(
+            child: Text(
+              text,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(fontSize: 12, color: color, height: 1.1),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final body = Obx(() => _buildBodyContent());
+
+    if (widget.embedded) {
+      return Material(
+        color: _groupedBg,
+        child: SafeArea(bottom: false, child: body),
+      );
+    }
+
+    return Scaffold(
+      backgroundColor: _groupedBg,
+      appBar: _buildAppBar(),
+      body: Material(color: _groupedBg, child: body),
     );
   }
 

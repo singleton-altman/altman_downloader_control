@@ -3,8 +3,7 @@ import 'package:altman_downloader_control/controller/protocol.dart';
 import 'package:altman_downloader_control/controller/qbittorrent/qb_controller.dart';
 import 'package:altman_downloader_control/model/qb_preferences_model.dart';
 import 'package:altman_downloader_control/utils/toast_utils.dart';
-import 'package:altman_downloader_control/widget/label_switch_form.dart';
-import 'package:altman_downloader_control/widget/lable_textfield_form.dart';
+import 'package:altman_downloader_control/widget/downloader_app_bar_back_button.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -19,12 +18,27 @@ void showTorrentDownloadScreen(
   List<String>? localFilePaths,
   required DownloaderControllerProtocol controller,
 }) {
-  showCupertinoSheet(
+  showModalBottomSheet(
     context: context,
-    builder: (context) => TorrentDownloadScreen(
-      downloadUrls: downloadUrls,
-      localFilePaths: localFilePaths,
-      controller: controller,
+    useRootNavigator: true,
+    isScrollControlled: true,
+    useSafeArea: true,
+    isDismissible: true,
+    backgroundColor: Colors.transparent,
+    builder: (context) => DraggableScrollableSheet(
+      initialChildSize: 0.92,
+      minChildSize: 0.36,
+      maxChildSize: 1,
+      expand: false,
+      builder: (context, scrollController) => ClipRRect(
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        child: TorrentDownloadScreen(
+          downloadUrls: downloadUrls,
+          localFilePaths: localFilePaths,
+          controller: controller,
+          scrollController: scrollController,
+        ),
+      ),
     ),
   );
 }
@@ -36,11 +50,13 @@ class TorrentDownloadScreen extends StatefulWidget {
     this.downloadUrls,
     this.localFilePaths,
     required this.controller,
+    this.scrollController,
   });
 
   final String? downloadUrls;
   final List<String>? localFilePaths;
   final DownloaderControllerProtocol controller;
+  final ScrollController? scrollController;
 
   @override
   State<TorrentDownloadScreen> createState() => _TorrentDownloadScreenState();
@@ -351,95 +367,236 @@ class _TorrentDownloadScreenState extends State<TorrentDownloadScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
-        borderRadius: const BorderRadius.only(
-          topLeft: Radius.circular(20),
-          topRight: Radius.circular(20),
-        ),
-      ),
-      child: Scaffold(
-        appBar: AppBar(
-          title: const Text('新建任务'),
-          leading: IconButton(
-            icon: const Icon(Icons.close),
-            onPressed: () => Navigator.of(context).pop(),
-          ),
-          actions: [_buildBottomButton()],
-        ),
-        body: SingleChildScrollView(
-          child: Column(
-            children: [
-              Obx(() {
-                final msg = _errorMsg.value;
-                if (msg == null || msg.isEmpty) return const SizedBox.shrink();
-                return Container(
-                  width: double.infinity,
-                  margin: const EdgeInsets.fromLTRB(8, 8, 8, 0),
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Theme.of(
-                      context,
-                    ).colorScheme.errorContainer.withValues(alpha: 0.3),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    msg,
-                    style: TextStyle(
-                      color: Theme.of(context).colorScheme.error,
-                    ),
-                  ),
-                );
-              }),
-              // Torrent 链接输入
-              _buildTorrentSection(),
-              _buildLocalFilesSection(),
-              // Torrent 选项
-              _buildBasicInfoSection(),
-              _buildDownloadControlSection(),
-              _buildDownloadOptionsSection(),
-              _buildSpeedLimitSection(),
-            ],
-          ),
+    final scheme = Theme.of(context).colorScheme;
+    return Scaffold(
+      backgroundColor: scheme.surface,
+      body: SafeArea(
+        top: false,
+        bottom: false,
+        child: Column(
+          children: [
+            _buildSheetHandle(),
+            _buildHeader(),
+            Expanded(
+              child: SingleChildScrollView(
+                controller: widget.scrollController,
+                physics: const BouncingScrollPhysics(),
+                padding: EdgeInsets.fromLTRB(
+                  16,
+                  8,
+                  16,
+                  18 + MediaQuery.viewInsetsOf(context).bottom,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _buildErrorBanner(),
+                    _buildTorrentSection(),
+                    _buildBasicInfoSection(),
+                    _buildDownloadControlSection(),
+                    _buildDownloadOptionsSection(),
+                    _buildSpeedLimitSection(),
+                  ],
+                ),
+              ),
+            ),
+            _buildSubmitBar(),
+          ],
         ),
       ),
     );
   }
 
-  Widget _buildTorrentSection() {
-    return CupertinoListSection.insetGrouped(
-      separatorColor: Colors.transparent,
-      children: [
-        Container(
-          constraints: const BoxConstraints(minHeight: 100, maxHeight: 200),
-          decoration: BoxDecoration(
-            color: Theme.of(
-              context,
-            ).colorScheme.surfaceContainer.withValues(alpha: 0.3),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: Theme.of(
-                context,
-              ).colorScheme.outline.withValues(alpha: 0.2),
+  Widget _buildSheetHandle() {
+    final scheme = Theme.of(context).colorScheme;
+    return Center(
+      child: Container(
+        margin: const EdgeInsets.only(top: 10, bottom: 6),
+        width: 40,
+        height: 4,
+        decoration: BoxDecoration(
+          color: scheme.onSurfaceVariant.withValues(alpha: 0.32),
+          borderRadius: BorderRadius.circular(999),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHeader() {
+    final scheme = Theme.of(context).colorScheme;
+    final downloaderName =
+        widget.controller.config?.name ??
+        (_isQBittorrent ? 'qBittorrent' : 'Transmission');
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 4, 8, 12),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(
+              color: scheme.primary.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(Icons.add_link_rounded, color: scheme.primary),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '新建下载任务',
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.w800,
+                    height: 1.1,
+                  ),
+                ),
+                const SizedBox(height: 5),
+                Text(
+                  '添加到 $downloaderName',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: scheme.onSurfaceVariant,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
             ),
           ),
-          child: TextField(
-            controller: _linkController,
-            maxLines: null,
-            style: Theme.of(context).textTheme.bodyMedium,
-            decoration: InputDecoration(
-              hintText: '请输入下载链接（每行一个）\n支持 HTTP 链接、Magnet 链接和 info-hash',
-              hintStyle: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: Theme.of(
-                  context,
-                ).colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
+          IconButton(
+            tooltip: '关闭',
+            onPressed: () => Navigator.of(context).pop(),
+            icon: const Icon(Icons.close_rounded),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildErrorBanner() {
+    return Obx(() {
+      final msg = _errorMsg.value;
+      if (msg == null || msg.isEmpty) return const SizedBox.shrink();
+      final scheme = Theme.of(context).colorScheme;
+      return Container(
+        width: double.infinity,
+        margin: const EdgeInsets.only(bottom: 10),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: scheme.errorContainer.withValues(alpha: 0.28),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: scheme.error.withValues(alpha: 0.18)),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(Icons.error_outline_rounded, size: 18, color: scheme.error),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                msg,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: scheme.error,
+                  fontWeight: FontWeight.w600,
+                  height: 1.35,
+                ),
               ),
-              border: InputBorder.none,
-              contentPadding: const EdgeInsets.all(12),
             ),
+          ],
+        ),
+      );
+    });
+  }
+
+  Widget _buildPanelSection({
+    required IconData icon,
+    required String title,
+    String? subtitle,
+    required List<Widget> children,
+  }) {
+    final scheme = Theme.of(context).colorScheme;
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainerLow.withValues(
+          alpha: Theme.of(context).brightness == Brightness.dark ? 0.72 : 1,
+        ),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: scheme.outlineVariant.withValues(alpha: 0.42),
+          width: 0.7,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 30,
+                height: 30,
+                decoration: BoxDecoration(
+                  color: scheme.primary.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(9),
+                ),
+                child: Icon(icon, size: 16, color: scheme.primary),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    if (subtitle != null) ...[
+                      const SizedBox(height: 3),
+                      Text(
+                        subtitle,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: scheme.onSurfaceVariant,
+                          height: 1.25,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          ...children,
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTorrentSection() {
+    return _buildPanelSection(
+      icon: Icons.link_rounded,
+      title: '下载源',
+      subtitle: '支持 HTTP、Magnet、info-hash；多条链接可按行输入。',
+      children: [
+        TextField(
+          controller: _linkController,
+          minLines: 4,
+          maxLines: 7,
+          textInputAction: TextInputAction.newline,
+          style: Theme.of(context).textTheme.bodyMedium,
+          decoration: const InputDecoration(
+            hintText: '粘贴下载链接，每行一个',
+            alignLabelWithHint: true,
           ),
         ),
+        _buildLocalFilesSection(),
       ],
     );
   }
@@ -447,18 +604,14 @@ class _TorrentDownloadScreenState extends State<TorrentDownloadScreen> {
   Widget _buildLocalFilesSection() {
     return Obx(() {
       if (_files.isEmpty) return const SizedBox.shrink();
-      return CupertinoListSection.insetGrouped(
-        separatorColor: Colors.transparent,
-        header: Text('本地文件', style: Theme.of(context).textTheme.titleMedium),
-        children: [
-          CupertinoListTile.notched(
-            title: Text('已准备 ${_files.length} 个本地文件'),
-            subtitle: Text(
-              _files.first,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-            trailing: const CupertinoListTileChevron(),
+      final scheme = Theme.of(context).colorScheme;
+      return Padding(
+        padding: const EdgeInsets.only(top: 10),
+        child: Material(
+          color: scheme.surfaceContainer.withValues(alpha: 0.62),
+          borderRadius: BorderRadius.circular(12),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(12),
             onTap: () {
               Navigator.of(context).push(
                 CupertinoPageRoute(
@@ -467,73 +620,208 @@ class _TorrentDownloadScreenState extends State<TorrentDownloadScreen> {
                 ),
               );
             },
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Row(
+                children: [
+                  Icon(Icons.description_outlined, color: scheme.secondary),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '已准备 ${_files.length} 个本地文件',
+                          style: Theme.of(context).textTheme.bodyMedium
+                              ?.copyWith(fontWeight: FontWeight.w700),
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          _files.first,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(color: scheme.onSurfaceVariant),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Icon(
+                    Icons.chevron_right_rounded,
+                    color: scheme.onSurfaceVariant,
+                  ),
+                ],
+              ),
+            ),
           ),
-        ],
+        ),
       );
     });
   }
 
+  Widget _buildTextFieldRow({
+    required String label,
+    required TextEditingController controller,
+    String? hintText,
+    TextInputType? keyboardType,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: TextField(
+        controller: controller,
+        keyboardType: keyboardType,
+        style: Theme.of(context).textTheme.bodyMedium,
+        decoration: InputDecoration(labelText: label, hintText: hintText),
+      ),
+    );
+  }
+
+  Widget _buildSwitchRow({
+    required String title,
+    String? subtitle,
+    required RxBool value,
+  }) {
+    final scheme = Theme.of(context).colorScheme;
+    return Obx(
+      () => Container(
+        margin: const EdgeInsets.only(bottom: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: scheme.surfaceContainer.withValues(alpha: 0.45),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  if (subtitle != null) ...[
+                    const SizedBox(height: 3),
+                    Text(
+                      subtitle,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: scheme.onSurfaceVariant,
+                        height: 1.25,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            Switch.adaptive(
+              value: value.value,
+              activeThumbColor: scheme.primary,
+              activeTrackColor: scheme.primary.withValues(alpha: 0.28),
+              onChanged: (next) => value.value = next,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSelectionRow({
+    required String label,
+    required String value,
+    required List<PopupMenuEntry<String>> items,
+    required ValueChanged<String> onSelected,
+  }) {
+    final scheme = Theme.of(context).colorScheme;
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainer.withValues(alpha: 0.45),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              label,
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700),
+            ),
+          ),
+          PopupMenuButton<String>(
+            tooltip: label,
+            borderRadius: BorderRadius.circular(12),
+            onSelected: onSelected,
+            itemBuilder: (_) => items,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 10),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 150),
+                    child: Text(
+                      value,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: scheme.primary,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  Icon(
+                    Icons.keyboard_arrow_down_rounded,
+                    size: 18,
+                    color: scheme.primary,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   /// 构建基本信息部分
   Widget _buildBasicInfoSection() {
-    return CupertinoListSection.insetGrouped(
-      separatorColor: Colors.transparent,
-      header: Text('基本信息', style: Theme.of(context).textTheme.titleMedium),
+    return _buildPanelSection(
+      icon: Icons.folder_copy_outlined,
+      title: '保存策略',
+      subtitle: '设置任务落盘位置、分类和显示名称。',
       children: [
-        LabelSwitchForm(
+        _buildSwitchRow(
           title: '自动管理种子',
-          initialValue: _autoTMM.value,
-          onChanged: (value) => _autoTMM.value = value,
+          subtitle: '允许下载器按分类规则管理保存路径。',
+          value: _autoTMM,
         ),
-
-        // Save files to location
-        LabelTextFieldForm(
-          title: '保存文件到',
+        _buildTextFieldRow(
+          label: '保存文件到',
           controller: _directoryController,
           hintText: '/downloads',
         ),
-        const SizedBox(height: 16),
-
-        // Rename torrent
-        LabelTextFieldForm(title: '重命名种子', controller: _renameController),
-
-        // Category（仅 qBittorrent 支持）
+        _buildTextFieldRow(label: '重命名种子', controller: _renameController),
         if (_isQBittorrent)
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-            child: Row(
-              children: [
-                Text(
-                  '分类',
-                  style: Get.textTheme.bodyLarge?.copyWith(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w500,
-                    color: Get.theme.colorScheme.onSurface,
-                  ),
-                ),
-                Spacer(),
-                PopupMenuButton(
-                  onSelected: (value) => _category.value = value,
-                  borderRadius: BorderRadius.circular(12),
-                  itemBuilder: (context) => _categories
-                      .map(
-                        (c) => PopupMenuItem(
-                          value: c,
-                          child: Text(
-                            c,
-                            style: Theme.of(context).textTheme.bodyMedium,
-                          ),
-                        ),
-                      )
-                      .toList(),
-                  child: Obx(
-                    () => Text(
-                      _category.value ?? '无',
-                      style: Get.textTheme.bodyLarge?.copyWith(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w500,
-                        color: Get.theme.colorScheme.primary,
-                      ),
-                    ),
+          Obx(
+            () => _buildSelectionRow(
+              label: '分类',
+              value: _category.value?.isNotEmpty == true
+                  ? _category.value!
+                  : '无',
+              onSelected: (value) =>
+                  _category.value = value.isEmpty ? null : value,
+              items: [
+                const PopupMenuItem(value: '', child: Text('无')),
+                ..._categories.map(
+                  (c) => PopupMenuItem(
+                    value: c,
+                    child: Text(c, overflow: TextOverflow.ellipsis),
                   ),
                 ),
               ],
@@ -545,80 +833,31 @@ class _TorrentDownloadScreenState extends State<TorrentDownloadScreen> {
 
   /// 构建下载控制部分
   Widget _buildDownloadControlSection() {
-    return CupertinoListSection.insetGrouped(
-      separatorColor: Colors.transparent,
-      header: Text('下载控制', style: Theme.of(context).textTheme.titleMedium),
+    return _buildPanelSection(
+      icon: Icons.play_circle_outline_rounded,
+      title: '启动行为',
+      subtitle: '决定任务加入队列后的启动和停止方式。',
       children: [
-        // Start torrent
-        LabelSwitchForm(
+        _buildSwitchRow(
           title: '开始下载',
-          initialValue: _autoStartDownload.value,
-          onChanged: (value) {
-            _autoStartDownload.value = value;
-          },
+          subtitle: '关闭后会以暂停状态添加。',
+          value: _autoStartDownload,
         ),
-
-        // Add to top of queue
-        LabelSwitchForm(
+        _buildSwitchRow(
           title: '添加到队列顶部',
-          initialValue: _addToTopOfQueue.value,
-          onChanged: (value) {
-            _addToTopOfQueue.value = value;
-          },
+          subtitle: '优先处理这批新任务。',
+          value: _addToTopOfQueue,
         ),
-
-        // Stop condition（仅 qBittorrent 支持）
         if (_isQBittorrent)
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-            child: Row(
-              children: [
-                Text(
-                  '停止条件',
-                  style: Get.textTheme.bodyLarge?.copyWith(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w500,
-                    color: Get.theme.colorScheme.onSurface,
-                  ),
-                ),
-                Spacer(),
-                PopupMenuButton(
-                  onSelected: (value) => _stopCondition.value = value,
-                  borderRadius: BorderRadius.circular(12),
-                  itemBuilder: (context) => [
-                    PopupMenuItem(
-                      value: 'None',
-                      child: Text(
-                        '无',
-                        style: Theme.of(context).textTheme.bodyMedium,
-                      ),
-                    ),
-                    PopupMenuItem(
-                      value: 'MetadataReceived',
-                      child: Text(
-                        '接收到元数据',
-                        style: Theme.of(context).textTheme.bodyMedium,
-                      ),
-                    ),
-                    PopupMenuItem(
-                      value: 'FilesChecked',
-                      child: Text(
-                        '文件检查完成',
-                        style: Theme.of(context).textTheme.bodyMedium,
-                      ),
-                    ),
-                  ],
-                  child: Obx(
-                    () => Text(
-                      _stopCondition.value,
-                      style: Get.textTheme.bodyLarge?.copyWith(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w500,
-                        color: Get.theme.colorScheme.primary,
-                      ),
-                    ),
-                  ),
-                ),
+          Obx(
+            () => _buildSelectionRow(
+              label: '停止条件',
+              value: _stopConditionLabel(_stopCondition.value),
+              onSelected: (value) => _stopCondition.value = value,
+              items: const [
+                PopupMenuItem(value: 'None', child: Text('无')),
+                PopupMenuItem(value: 'MetadataReceived', child: Text('接收到元数据')),
+                PopupMenuItem(value: 'FilesChecked', child: Text('文件检查完成')),
               ],
             ),
           ),
@@ -628,91 +867,38 @@ class _TorrentDownloadScreenState extends State<TorrentDownloadScreen> {
 
   /// 构建下载选项部分
   Widget _buildDownloadOptionsSection() {
-    return CupertinoListSection.insetGrouped(
-      separatorColor: Colors.transparent,
-      header: Text('下载选项', style: Theme.of(context).textTheme.titleMedium),
+    return _buildPanelSection(
+      icon: Icons.tune_rounded,
+      title: '下载选项',
+      subtitle: '校验、文件布局和分片下载策略。',
       children: [
-        // Skip hash check
-        LabelSwitchForm(
+        _buildSwitchRow(
           title: '跳过哈希检查',
-          initialValue: _skipHashCheck.value,
-          onChanged: (value) {
-            _skipHashCheck.value = value;
-          },
+          subtitle: '适合已确认完整的本地数据。',
+          value: _skipHashCheck,
         ),
-
-        // Content layout（仅 qBittorrent 支持）
         if (_isQBittorrent)
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-            child: Row(
-              children: [
-                Text(
-                  '内容布局',
-                  style: Get.textTheme.bodyLarge?.copyWith(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w500,
-                    color: Get.theme.colorScheme.onSurface,
-                  ),
-                ),
-                Spacer(),
-                PopupMenuButton(
-                  borderRadius: BorderRadius.circular(12),
-                  onSelected: (value) => _contentLayout.value = value,
-                  itemBuilder: (context) => [
-                    PopupMenuItem(
-                      value: 'Original',
-                      child: Text(
-                        '原始',
-                        style: Theme.of(context).textTheme.bodyMedium,
-                      ),
-                    ),
-                    PopupMenuItem(
-                      value: 'Subfolder',
-                      child: Text(
-                        '子文件夹',
-                        style: Theme.of(context).textTheme.bodyMedium,
-                      ),
-                    ),
-                    PopupMenuItem(
-                      value: 'NoSubfolder',
-                      child: Text(
-                        '无子文件夹',
-                        style: Theme.of(context).textTheme.bodyMedium,
-                      ),
-                    ),
-                  ],
-                  child: Obx(
-                    () => Text(
-                      _contentLayout.value,
-                      style: Get.textTheme.bodyLarge?.copyWith(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w500,
-                        color: Get.theme.colorScheme.primary,
-                      ),
-                    ),
-                  ),
-                ),
+          Obx(
+            () => _buildSelectionRow(
+              label: '内容布局',
+              value: _contentLayoutLabel(_contentLayout.value),
+              onSelected: (value) => _contentLayout.value = value,
+              items: const [
+                PopupMenuItem(value: 'Original', child: Text('原始')),
+                PopupMenuItem(value: 'Subfolder', child: Text('子文件夹')),
+                PopupMenuItem(value: 'NoSubfolder', child: Text('无子文件夹')),
               ],
             ),
           ),
-
-        // Download in sequential order
-        LabelSwitchForm(
+        _buildSwitchRow(
           title: '顺序下载',
-          initialValue: _sequentialDownload.value,
-          onChanged: (value) {
-            _sequentialDownload.value = value;
-          },
+          subtitle: '按文件顺序下载，适合边下边看。',
+          value: _sequentialDownload,
         ),
-
-        // Download first and last pieces first
-        LabelSwitchForm(
+        _buildSwitchRow(
           title: '优先下载首尾片段',
-          initialValue: _firstLastPiece.value,
-          onChanged: (value) {
-            _firstLastPiece.value = value;
-          },
+          subtitle: '加快媒体文件识别和预览。',
+          value: _firstLastPiece,
         ),
       ],
     );
@@ -720,20 +906,19 @@ class _TorrentDownloadScreenState extends State<TorrentDownloadScreen> {
 
   /// 构建速度限制部分
   Widget _buildSpeedLimitSection() {
-    return CupertinoListSection.insetGrouped(
-      separatorColor: Colors.transparent,
-      header: Text('速度限制', style: Theme.of(context).textTheme.titleMedium),
+    return _buildPanelSection(
+      icon: Icons.speed_rounded,
+      title: '速度限制',
+      subtitle: '单位 KB/s，0 表示不限制。',
       children: [
-        // Limit download rate
-        LabelTextFieldForm(
-          title: '限制下载速度',
+        _buildTextFieldRow(
+          label: '限制下载速度',
           controller: _dlSpeedLimitController,
           keyboardType: TextInputType.number,
           hintText: '0',
         ),
-        // Limit upload rate
-        LabelTextFieldForm(
-          title: '限制上传速度',
+        _buildTextFieldRow(
+          label: '限制上传速度',
           controller: _upSpeedLimitController,
           keyboardType: TextInputType.number,
           hintText: '0',
@@ -742,32 +927,63 @@ class _TorrentDownloadScreenState extends State<TorrentDownloadScreen> {
     );
   }
 
-  Widget _buildBottomButton() {
+  String _stopConditionLabel(String value) {
+    switch (value) {
+      case 'MetadataReceived':
+        return '接收到元数据';
+      case 'FilesChecked':
+        return '文件检查完成';
+      default:
+        return '无';
+    }
+  }
+
+  String _contentLayoutLabel(String value) {
+    switch (value) {
+      case 'Subfolder':
+        return '子文件夹';
+      case 'NoSubfolder':
+        return '无子文件夹';
+      default:
+        return '原始';
+    }
+  }
+
+  Widget _buildSubmitBar() {
+    final scheme = Theme.of(context).colorScheme;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: EdgeInsets.fromLTRB(
+        16,
+        10,
+        16,
+        MediaQuery.paddingOf(context).bottom + 12,
+      ),
       decoration: BoxDecoration(
+        color: scheme.surface.withValues(alpha: 0.96),
         border: Border(
           top: BorderSide(
-            color: Theme.of(context).dividerColor.withValues(alpha: 0.2),
-            width: 1,
+            color: scheme.outlineVariant.withValues(alpha: 0.55),
+            width: 0.7,
           ),
         ),
       ),
       child: Obx(() {
         if (_isUploading.value) {
-          return const Center(
-            child: Padding(
-              padding: EdgeInsets.all(16),
-              child: CupertinoActivityIndicator(),
+          return SizedBox(
+            height: 48,
+            child: Center(
+              child: CupertinoActivityIndicator(color: scheme.primary),
             ),
           );
         }
 
-        return ElevatedButton(
-          onPressed: _onDownload,
-          child: const Text(
-            '下载',
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+        return SizedBox(
+          height: 48,
+          width: double.infinity,
+          child: FilledButton.icon(
+            onPressed: _onDownload,
+            icon: const Icon(Icons.add_task_rounded, size: 19),
+            label: const Text('添加下载任务'),
           ),
         );
       }),
@@ -783,7 +999,12 @@ class LocalTorrentFilesPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('本地文件路径')),
+      appBar: AppBar(
+        title: const Text('本地文件路径'),
+        automaticallyImplyLeading: false,
+        leadingWidth: DownloaderAppBarBackButton.leadingWidth,
+        leading: const DownloaderAppBarBackButton(),
+      ),
       body: ListView.separated(
         padding: const EdgeInsets.all(16),
         itemBuilder: (context, index) {

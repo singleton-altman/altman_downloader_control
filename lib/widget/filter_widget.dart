@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:altman_downloader_control/controller/protocol.dart';
 import 'package:altman_downloader_control/controller/qbittorrent/qb_controller.dart';
 import 'package:altman_downloader_control/model/qb_filter_model.dart';
+import 'package:altman_downloader_control/theme/downloader_cupertino_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
@@ -214,34 +215,32 @@ class _GenericFilterWidgetInternalState
 
   @override
   Widget build(BuildContext context) {
-    return SliverToBoxAdapter(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildFilterSection(
-              title: '状态',
-              options: availableStatuses,
-              selectedSet: selectedStatuses,
-            ),
-            _buildFilterSection(
-              title: '分类',
-              options: availableCategories,
-              selectedSet: selectedCategories,
-            ),
-            _buildFilterSection(
-              title: '标签',
-              options: availableTags,
-              selectedSet: selectedTags,
-            ),
-            _buildFilterSection(
-              title: 'Tracker',
-              options: availableTrackers,
-              selectedSet: selectedTrackers,
-            ),
-          ],
-        ),
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildFilterSection(
+            title: '状态',
+            options: availableStatuses,
+            selectedSet: selectedStatuses,
+          ),
+          _buildFilterSection(
+            title: '分类',
+            options: availableCategories,
+            selectedSet: selectedCategories,
+          ),
+          _buildFilterSection(
+            title: '标签',
+            options: availableTags,
+            selectedSet: selectedTags,
+          ),
+          _buildFilterSection(
+            title: 'Tracker',
+            options: availableTrackers,
+            selectedSet: selectedTrackers,
+          ),
+        ],
       ),
     );
   }
@@ -638,115 +637,108 @@ class _QBFilterWidgetInternalState extends State<_QBFilterWidgetInternal> {
 
   @override
   Widget build(BuildContext context) {
-    return SliverToBoxAdapter(
-      child: Container(
-        padding: EdgeInsets.fromLTRB(
-          12,
-          widget.embeddedInSheet ? 0 : 6,
-          12,
-          12,
-        ),
-        decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.surface,
-          border: widget.embeddedInSheet
-              ? null
-              : Border(
-                  bottom: BorderSide(
-                    color: Theme.of(
-                      context,
-                    ).colorScheme.outline.withValues(alpha: 0.1),
-                    width: 0.5,
-                  ),
+    return Container(
+      padding: EdgeInsets.fromLTRB(12, widget.embeddedInSheet ? 0 : 6, 12, 12),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        border: widget.embeddedInSheet
+            ? null
+            : Border(
+                bottom: BorderSide(
+                  color: Theme.of(
+                    context,
+                  ).colorScheme.outline.withValues(alpha: 0.1),
+                  width: 0.5,
                 ),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildFlatSection(
+              ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildFlatSection(
+            context: context,
+            title: '状态',
+            icon: Icons.info_outline,
+            options: QBFilterStatus.allStatuses.map((e) => e.value).toList(),
+            labels: QBFilterStatus.allStatuses.map((e) => e.label).toList(),
+            selected: selectedStatuses,
+            onToggle: (value) {
+              if (selectedStatuses.contains(value)) {
+                selectedStatuses.remove(value);
+              } else {
+                selectedStatuses.add(value);
+              }
+              _updateFilter(immediate: true);
+            },
+            getCount: _getStatusCount,
+            getSize: _getStatusSize,
+          ),
+          const SizedBox(height: 10),
+          Obx(
+            () => _buildFlatSection(
               context: context,
-              title: '状态',
-              icon: Icons.info_outline,
-              options: QBFilterStatus.allStatuses.map((e) => e.value).toList(),
-              labels: QBFilterStatus.allStatuses.map((e) => e.label).toList(),
-              selected: selectedStatuses,
+              title: '分类',
+              icon: Icons.category,
+              options: availableCategories.toList(),
+              labels: availableCategories
+                  .map((e) => e.isEmpty ? '无分类' : e)
+                  .toList(),
+              selected: selectedCategories,
               onToggle: (value) {
-                if (selectedStatuses.contains(value)) {
-                  selectedStatuses.remove(value);
+                if (selectedCategories.contains(value)) {
+                  selectedCategories.remove(value);
                 } else {
-                  selectedStatuses.add(value);
+                  selectedCategories.add(value);
                 }
                 _updateFilter(immediate: true);
               },
-              getCount: _getStatusCount,
-              getSize: _getStatusSize,
+              getCount: _getCategoryCount,
+              getSize: _getCategorySize,
             ),
-            const SizedBox(height: 10),
-            Obx(
-              () => _buildFlatSection(
-                context: context,
-                title: '分类',
-                icon: Icons.category,
-                options: availableCategories.toList(),
-                labels: availableCategories
-                    .map((e) => e.isEmpty ? '无分类' : e)
-                    .toList(),
-                selected: selectedCategories,
-                onToggle: (value) {
-                  if (selectedCategories.contains(value)) {
-                    selectedCategories.remove(value);
-                  } else {
-                    selectedCategories.add(value);
-                  }
-                  _updateFilter(immediate: true);
-                },
-                getCount: _getCategoryCount,
-                getSize: _getCategorySize,
-              ),
+          ),
+          const SizedBox(height: 10),
+          Obx(
+            () => _buildFlatSection(
+              context: context,
+              title: '标签',
+              icon: Icons.label,
+              options: availableTags.toList(),
+              labels: availableTags.toList(),
+              selected: selectedTags,
+              onToggle: (value) {
+                if (selectedTags.contains(value)) {
+                  selectedTags.remove(value);
+                } else {
+                  selectedTags.add(value);
+                }
+                _updateFilter(immediate: true);
+              },
+              getCount: _getTagCount,
+              getSize: _getTagSize,
             ),
-            const SizedBox(height: 10),
-            Obx(
-              () => _buildFlatSection(
-                context: context,
-                title: '标签',
-                icon: Icons.label,
-                options: availableTags.toList(),
-                labels: availableTags.toList(),
-                selected: selectedTags,
-                onToggle: (value) {
-                  if (selectedTags.contains(value)) {
-                    selectedTags.remove(value);
-                  } else {
-                    selectedTags.add(value);
-                  }
-                  _updateFilter(immediate: true);
-                },
-                getCount: _getTagCount,
-                getSize: _getTagSize,
-              ),
+          ),
+          const SizedBox(height: 10),
+          Obx(
+            () => _buildFlatSection(
+              context: context,
+              title: 'Tracker',
+              icon: Icons.dns,
+              options: availableTrackers.toList(),
+              labels: availableTrackers.toList(),
+              selected: selectedTrackers,
+              onToggle: (value) {
+                if (selectedTrackers.contains(value)) {
+                  selectedTrackers.remove(value);
+                } else {
+                  selectedTrackers.add(value);
+                }
+                _updateFilter(immediate: true);
+              },
+              getCount: _getTrackerCount,
+              getSize: _getTrackerSize,
             ),
-            const SizedBox(height: 10),
-            Obx(
-              () => _buildFlatSection(
-                context: context,
-                title: 'Tracker',
-                icon: Icons.dns,
-                options: availableTrackers.toList(),
-                labels: availableTrackers.toList(),
-                selected: selectedTrackers,
-                onToggle: (value) {
-                  if (selectedTrackers.contains(value)) {
-                    selectedTrackers.remove(value);
-                  } else {
-                    selectedTrackers.add(value);
-                  }
-                  _updateFilter(immediate: true);
-                },
-                getCount: _getTrackerCount,
-                getSize: _getTrackerSize,
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -841,89 +833,107 @@ class _QBFilterWidgetInternalState extends State<_QBFilterWidgetInternal> {
 Future<void> showQBFilterDraggableSheet(BuildContext context, QBController qb) {
   return showModalBottomSheet<void>(
     context: context,
+    useRootNavigator: true,
     isScrollControlled: true,
+    useSafeArea: true,
     backgroundColor: Colors.transparent,
     builder: (ctx) {
-      return DraggableScrollableSheet(
-        expand: false,
-        initialChildSize: 0.5,
-        minChildSize: 0.26,
-        maxChildSize: 0.92,
-        builder: (ctx, scrollController) {
-          final scheme = Theme.of(ctx).colorScheme;
-          final bottomInset = MediaQuery.paddingOf(ctx).bottom;
-          return ClipRRect(
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(18)),
-            child: Material(
-              color: scheme.surface,
-              child: CustomScrollView(
-                controller: scrollController,
-                slivers: [
-                  SliverToBoxAdapter(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const SizedBox(height: 8),
-                        Center(
-                          child: Container(
-                            width: 36,
-                            height: 3,
-                            decoration: BoxDecoration(
-                              color: scheme.onSurfaceVariant.withValues(
-                                alpha: 0.3,
+      final shellBottomGap =
+          DownloaderCupertinoTheme.shellTabBarHeight +
+          MediaQuery.paddingOf(ctx).bottom;
+
+      return Padding(
+        padding: EdgeInsets.only(bottom: shellBottomGap),
+        child: DraggableScrollableSheet(
+          expand: false,
+          initialChildSize: 0.5,
+          minChildSize: 0.26,
+          maxChildSize: 0.92,
+          builder: (ctx, scrollController) {
+            final scheme = Theme.of(ctx).colorScheme;
+            final bottomInset = MediaQuery.paddingOf(ctx).bottom;
+            return ClipRRect(
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(18),
+              ),
+              child: Material(
+                color: scheme.surface,
+                child: CustomScrollView(
+                  controller: scrollController,
+                  slivers: [
+                    SliverToBoxAdapter(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const SizedBox(height: 8),
+                          Center(
+                            child: Container(
+                              width: 36,
+                              height: 3,
+                              decoration: BoxDecoration(
+                                color: scheme.onSurfaceVariant.withValues(
+                                  alpha: 0.3,
+                                ),
+                                borderRadius: BorderRadius.circular(2),
                               ),
-                              borderRadius: BorderRadius.circular(2),
                             ),
                           ),
-                        ),
-                        Padding(
-                          padding: const EdgeInsets.fromLTRB(12, 10, 4, 4),
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.center,
-                            children: [
-                              Text(
-                                '筛选',
-                                style: Theme.of(ctx).textTheme.titleMedium
-                                    ?.copyWith(fontWeight: FontWeight.w700),
-                              ),
-                              const Spacer(),
-                              Obx(() {
-                                if (!qb.filter.value.hasFilters) {
-                                  return const SizedBox.shrink();
-                                }
-                                return TextButton(
-                                  onPressed: qb.clearFilter,
-                                  style: TextButton.styleFrom(
-                                    foregroundColor: scheme.error,
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 8,
-                                      vertical: 4,
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(12, 10, 4, 4),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.center,
+                              children: [
+                                Text(
+                                  '筛选',
+                                  style: Theme.of(ctx).textTheme.titleMedium
+                                      ?.copyWith(fontWeight: FontWeight.w700),
+                                ),
+                                const Spacer(),
+                                Obx(() {
+                                  if (!qb.filter.value.hasFilters) {
+                                    return const SizedBox.shrink();
+                                  }
+                                  return TextButton(
+                                    onPressed: qb.clearFilter,
+                                    style: TextButton.styleFrom(
+                                      foregroundColor: scheme.error,
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 8,
+                                        vertical: 4,
+                                      ),
+                                      minimumSize: Size.zero,
+                                      tapTargetSize:
+                                          MaterialTapTargetSize.shrinkWrap,
                                     ),
-                                    minimumSize: Size.zero,
-                                    tapTargetSize:
-                                        MaterialTapTargetSize.shrinkWrap,
-                                  ),
-                                  child: const Text('清空'),
-                                );
-                              }),
-                              IconButton(
-                                icon: const Icon(Icons.close),
-                                tooltip: '关闭',
-                                onPressed: () => Navigator.of(ctx).pop(),
-                              ),
-                            ],
+                                    child: const Text('清空'),
+                                  );
+                                }),
+                                IconButton(
+                                  icon: const Icon(Icons.close),
+                                  tooltip: '关闭',
+                                  onPressed: () => Navigator.of(ctx).pop(),
+                                ),
+                              ],
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
-                  ),
-                  QBFilterWidget(controller: qb, embeddedInSheet: true),
-                  SliverToBoxAdapter(child: SizedBox(height: bottomInset + 8)),
-                ],
+                    SliverToBoxAdapter(
+                      child: QBFilterWidget(
+                        controller: qb,
+                        embeddedInSheet: true,
+                      ),
+                    ),
+                    SliverToBoxAdapter(
+                      child: SizedBox(height: bottomInset + 8),
+                    ),
+                  ],
+                ),
               ),
-            ),
-          );
-        },
+            );
+          },
+        ),
       );
     },
   );

@@ -1,14 +1,16 @@
+import 'dart:async';
 import 'dart:math';
 import 'dart:ui';
 
 import 'package:altman_downloader_control/controller/downloader_config.dart';
 import 'package:altman_downloader_control/controller/protocol.dart';
 import 'package:altman_downloader_control/model/torrent_item_model.dart';
-import 'package:altman_downloader_control/page/downloader_profile_page.dart';
+import 'package:altman_downloader_control/page/downloader_shell_chrome.dart';
 import 'package:altman_downloader_control/page/qbittorrent/qb_log_page.dart';
-import 'package:altman_downloader_control/page/qbittorrent/qb_rss_list_page.dart';
 import 'package:altman_downloader_control/page/torrent_download_screen.dart';
+import 'package:altman_downloader_control/theme/downloader_cupertino_theme.dart';
 import 'package:altman_downloader_control/utils/toast_utils.dart';
+import 'package:altman_downloader_control/widget/downloader_app_bar_back_button.dart';
 import 'package:altman_downloader_control/widget/filter_widget.dart';
 import 'package:altman_downloader_control/widget/input_dialog.dart'
     show showMSConfirmDialog;
@@ -27,16 +29,23 @@ import 'package:altman_downloader_control/utils/torrent_state_localizable.dart';
 
 enum _SortDirectionChoice { ascending, descending }
 
-class DownloaderTorrentListPage extends StatefulWidget {
-  const DownloaderTorrentListPage({super.key});
+enum _AppBarMenuAction { filter, select, log }
+
+class DownloaderTorrentListTab extends StatefulWidget {
+  const DownloaderTorrentListTab({super.key, this.embeddedInShell = false});
+
+  final bool embeddedInShell;
 
   @override
-  State<DownloaderTorrentListPage> createState() =>
-      _DownloaderTorrentListPageState();
+  State<DownloaderTorrentListTab> createState() =>
+      _DownloaderTorrentListTabState();
 }
 
-class _DownloaderTorrentListPageState extends State<DownloaderTorrentListPage> {
+class _DownloaderTorrentListTabState extends State<DownloaderTorrentListTab> {
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   late final DownloaderControllerProtocol controller;
+  late final TextEditingController _searchController;
+  Timer? _searchDebounce;
   final _isBootstrapping = true.obs;
   bool _selectionMode = false;
   final Set<String> _selectedHashes = <String>{};
@@ -47,7 +56,69 @@ class _DownloaderTorrentListPageState extends State<DownloaderTorrentListPage> {
   void initState() {
     super.initState();
     controller = Get.find<DownloaderControllerProtocol>();
+    _searchController = TextEditingController();
+    _syncSearchFromController();
+    _searchController.addListener(_onSearchChanged);
     _bootstrap();
+  }
+
+  @override
+  void dispose() {
+    _searchDebounce?.cancel();
+    _searchController.dispose();
+    _setShellTabBarHidden(false);
+    super.dispose();
+  }
+
+  void _setShellTabBarHidden(bool hidden) {
+    if (!widget.embeddedInShell) return;
+    if (DownloaderShellChrome.hideTabBar.value == hidden) return;
+    DownloaderShellChrome.hideTabBar.value = hidden;
+  }
+
+  void _setSelectionMode(bool value, {bool clearSelection = false}) {
+    setState(() {
+      _selectionMode = value;
+      if (clearSelection) {
+        _selectedHashes.clear();
+      }
+    });
+    _setShellTabBarHidden(value);
+  }
+
+  void _enterSelectionMode({String? hash}) {
+    setState(() {
+      if (hash != null) {
+        _selectedHashes.add(hash);
+      }
+      _selectionMode = true;
+    });
+    _setShellTabBarHidden(true);
+  }
+
+  void _syncSearchFromController() {
+    if (controller is QBController) {
+      _searchController.text =
+          (controller as QBController).filter.value.searchKeyword;
+    } else if (controller is TransmissionController) {
+      _searchController.text =
+          (controller as TransmissionController).listSearchKeyword.value;
+    }
+  }
+
+  void _onSearchChanged() {
+    _searchDebounce?.cancel();
+    _searchDebounce = Timer(const Duration(milliseconds: 220), () {
+      final text = _searchController.text.trim();
+      if (controller is QBController) {
+        final qb = controller as QBController;
+        if (qb.filter.value.searchKeyword != text) {
+          qb.setFilter(qb.filter.value.copyWith(searchKeyword: text));
+        }
+      } else if (controller is TransmissionController) {
+        (controller as TransmissionController).listSearchKeyword.value = text;
+      }
+    });
   }
 
   Future<void> _bootstrap() async {
@@ -295,10 +366,7 @@ class _DownloaderTorrentListPageState extends State<DownloaderTorrentListPage> {
   }
 
   void _exitSelectionMode() {
-    setState(() {
-      _selectionMode = false;
-      _selectedHashes.clear();
-    });
+    _setSelectionMode(false, clearSelection: true);
   }
 
   void _toggleHash(String hash) {
@@ -387,6 +455,9 @@ class _DownloaderTorrentListPageState extends State<DownloaderTorrentListPage> {
         _selectionMode = false;
       }
     });
+    if (_selectedHashes.isEmpty) {
+      _setShellTabBarHidden(false);
+    }
   }
 
   TorrentModel? _torrentForHash(String hash) {
@@ -919,33 +990,395 @@ class _DownloaderTorrentListPageState extends State<DownloaderTorrentListPage> {
         return _buildPageScaffold(context);
       });
     }
-    return Obx(() {
-      filteredTorrentsList;
-      return _buildPageScaffold(context);
-    });
+    return _buildPageScaffold(context);
+  }
+
+  double _bottomContentInset(BuildContext context) {
+    final base = MediaQuery.paddingOf(context).bottom;
+    final tabBar = widget.embeddedInShell && !_selectionMode
+        ? DownloaderCupertinoTheme.shellTabBarHeight
+        : 0.0;
+    return base + tabBar + (_selectionMode ? 88 : 24);
   }
 
   Widget _buildPageScaffold(BuildContext context) {
     return Scaffold(
+      key: _scaffoldKey,
+      onEndDrawerChanged: (isOpened) {
+        _setShellTabBarHidden(isOpened || _selectionMode);
+      },
+      endDrawer: controller is QBController
+          ? _buildFilterDrawer(context)
+          : null,
       appBar: _buildAppBar(context),
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
       floatingActionButton: _selectionMode
-          ? _buildSelectionFloatingBar(context)
-          : _buildFloatingToolbar(context),
-      body: RefreshIndicator(
-        onRefresh: _refreshData,
+          ? null
+          : Padding(
+              padding: EdgeInsets.only(
+                bottom: widget.embeddedInShell
+                    ? DownloaderCupertinoTheme.shellTabBarHeight
+                    : 0,
+              ),
+              child: FloatingActionButton(
+                onPressed: () =>
+                    showTorrentDownloadScreen(context, controller: controller),
+                child: const Icon(CupertinoIcons.add),
+              ),
+            ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
+      body: Obx(() {
+        filteredTorrentsList;
+        _isBootstrapping.value;
+        return Stack(
+          children: [
+            RefreshIndicator(
+              onRefresh: _refreshData,
+              child: CustomScrollView(
+                slivers: [
+                  SliverToBoxAdapter(child: _buildErrorMessage(context)),
+                  SliverToBoxAdapter(child: _buildSearchBar(context)),
+                  SliverToBoxAdapter(child: _buildListControlSummary(context)),
+                  _buildTorrentListSliver(context),
+                  SliverToBoxAdapter(
+                    child: SizedBox(height: _bottomContentInset(context)),
+                  ),
+                ],
+              ),
+            ),
+            if (_selectionMode)
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom:
+                    MediaQuery.paddingOf(context).bottom +
+                    (widget.embeddedInShell && !_selectionMode
+                        ? DownloaderCupertinoTheme.shellTabBarHeight
+                        : 0) +
+                    8,
+                child: _buildSelectionFloatingBar(context),
+              ),
+          ],
+        );
+      }),
+    );
+  }
+
+  Widget _buildFilterDrawer(BuildContext context) {
+    final qb = controller as QBController;
+    final scheme = Theme.of(context).colorScheme;
+    return Drawer(
+      width: min(360, MediaQuery.sizeOf(context).width * 0.88),
+      child: SafeArea(
         child: CustomScrollView(
           slivers: [
-            SliverToBoxAdapter(child: _buildErrorMessage(context)),
-            _buildTorrentList(context),
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(4, 4, 8, 0),
+                child: Row(
+                  children: [
+                    IconButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      icon: const Icon(Icons.close_rounded),
+                    ),
+                    Text(
+                      '筛选',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const Spacer(),
+                    Obx(() {
+                      if (!qb.filter.value.hasFilters) {
+                        return const SizedBox.shrink();
+                      }
+                      return TextButton(
+                        onPressed: qb.clearFilter,
+                        style: TextButton.styleFrom(
+                          foregroundColor: scheme.error,
+                        ),
+                        child: const Text('清除'),
+                      );
+                    }),
+                  ],
+                ),
+              ),
+            ),
+            SliverToBoxAdapter(
+              child: QBFilterWidget(controller: qb, embeddedInSheet: true),
+            ),
             SliverToBoxAdapter(
               child: SizedBox(
                 height:
-                    MediaQuery.of(context).padding.bottom +
-                    (_selectionMode ? 88 : 76),
+                    MediaQuery.paddingOf(context).bottom +
+                    (widget.embeddedInShell
+                        ? DownloaderCupertinoTheme.shellTabBarHeight
+                        : 0) +
+                    12,
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSearchBar(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 8, 12, 6),
+      child: AnimatedBuilder(
+        animation: _searchController,
+        builder: (context, _) {
+          final hasKeyword = _searchController.text.trim().isNotEmpty;
+          final fillColor = isDark
+              ? const Color(0xFF24272D)
+              : scheme.surfaceContainerHighest.withValues(alpha: 0.62);
+
+          return Container(
+            height: 40,
+            decoration: BoxDecoration(
+              color: fillColor,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(
+                color: hasKeyword
+                    ? scheme.primary.withValues(alpha: 0.22)
+                    : Colors.transparent,
+                width: 0.7,
+              ),
+            ),
+            child: Row(
+              children: [
+                const SizedBox(width: 10),
+                Icon(
+                  CupertinoIcons.search,
+                  size: 17,
+                  color: scheme.onSurfaceVariant.withValues(alpha: 0.62),
+                ),
+                const SizedBox(width: 7),
+                Expanded(
+                  child: CupertinoTextField.borderless(
+                    controller: _searchController,
+                    textInputAction: TextInputAction.search,
+                    cursorColor: scheme.primary,
+                    placeholder: controller is TransmissionController
+                        ? '搜索名称、分类、标签'
+                        : '搜索标题、分类、标签',
+                    placeholderStyle: TextStyle(
+                      color: scheme.onSurfaceVariant.withValues(alpha: 0.58),
+                      fontSize: 15,
+                      fontWeight: FontWeight.w400,
+                    ),
+                    style: TextStyle(
+                      color: scheme.onSurface,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w400,
+                    ),
+                    padding: EdgeInsets.zero,
+                    decoration: null,
+                    onSubmitted: (_) => FocusScope.of(context).unfocus(),
+                  ),
+                ),
+                if (hasKeyword)
+                  CupertinoButton(
+                    minimumSize: const Size(34, 34),
+                    padding: EdgeInsets.zero,
+                    onPressed: _searchController.clear,
+                    child: Icon(
+                      CupertinoIcons.xmark_circle_fill,
+                      size: 17,
+                      color: scheme.onSurfaceVariant.withValues(alpha: 0.46),
+                    ),
+                  )
+                else
+                  const SizedBox(width: 10),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  String _activeSearchKeyword() {
+    if (controller is QBController) {
+      return (controller as QBController).filter.value.searchKeyword.trim();
+    }
+    if (controller is TransmissionController) {
+      return (controller as TransmissionController).listSearchKeyword.value
+          .trim();
+    }
+    return '';
+  }
+
+  bool _hasActiveFilters() {
+    if (controller is QBController) {
+      return (controller as QBController).filter.value.hasFilters;
+    }
+    if (controller is TransmissionController) {
+      return (controller as TransmissionController).listSearchKeyword.value
+          .trim()
+          .isNotEmpty;
+    }
+    return false;
+  }
+
+  String _currentSortLabel() {
+    if (controller is QBController) {
+      return (controller as QBController).torrentSortType.value.label;
+    }
+    if (controller is TransmissionController) {
+      return (controller as TransmissionController).listSortType.value.label;
+    }
+    return '默认';
+  }
+
+  bool _currentSortAscending() {
+    if (controller is QBController) {
+      final qb = controller as QBController;
+      return _isQbSortAscending(qb.torrentSortType.value);
+    }
+    if (controller is TransmissionController) {
+      final tr = controller as TransmissionController;
+      return _isTransmissionSortAscending(tr.listSortType.value);
+    }
+    return true;
+  }
+
+  void _clearListFilters() {
+    _searchController.clear();
+    if (controller is QBController) {
+      (controller as QBController).clearFilter();
+    } else if (controller is TransmissionController) {
+      (controller as TransmissionController).listSearchKeyword.value = '';
+    }
+  }
+
+  Widget _buildListControlSummary(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final displayCount = filteredTorrentsList.length;
+    final totalCount = controller.torrentsUniversal.length;
+    final keyword = _activeSearchKeyword();
+    final hasFilters = _hasActiveFilters();
+    final sortAscending = _currentSortAscending();
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        physics: const BouncingScrollPhysics(),
+        child: Row(
+          children: [
+            _buildSummaryPill(
+              context,
+              icon: Icons.format_list_bulleted_rounded,
+              text: totalCount == displayCount
+                  ? '$displayCount 个任务'
+                  : '显示 $displayCount / $totalCount',
+              color: scheme.primary,
+            ),
+            const SizedBox(width: 6),
+            _buildSummaryPill(
+              context,
+              icon: sortAscending
+                  ? Icons.arrow_upward_rounded
+                  : Icons.arrow_downward_rounded,
+              text: '按 ${_currentSortLabel()} ${sortAscending ? '正序' : '倒序'}',
+              color: scheme.onSurfaceVariant,
+            ),
+            if (keyword.isNotEmpty) ...[
+              const SizedBox(width: 6),
+              _buildSummaryPill(
+                context,
+                icon: CupertinoIcons.search,
+                text: keyword,
+                color: scheme.secondary,
+              ),
+            ],
+            if (hasFilters) ...[
+              const SizedBox(width: 6),
+              _buildClearFilterPill(context),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSummaryPill(
+    BuildContext context, {
+    required IconData icon,
+    required String text,
+    required Color color,
+  }) {
+    final scheme = Theme.of(context).colorScheme;
+    return Container(
+      constraints: const BoxConstraints(maxWidth: 220),
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: color.withValues(alpha: 0.18), width: 0.6),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 13, color: color),
+          const SizedBox(width: 5),
+          Flexible(
+            child: Text(
+              text,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                color: color == scheme.onSurfaceVariant
+                    ? scheme.onSurfaceVariant
+                    : color,
+                fontSize: 11.5,
+                fontWeight: FontWeight.w700,
+                height: 1,
+                fontFeatures: const [FontFeature.tabularFigures()],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildClearFilterPill(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Material(
+      color: scheme.error.withValues(alpha: 0.1),
+      borderRadius: BorderRadius.circular(999),
+      child: InkWell(
+        onTap: _clearListFilters,
+        borderRadius: BorderRadius.circular(999),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(
+              color: scheme.error.withValues(alpha: 0.18),
+              width: 0.6,
+            ),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.close_rounded, size: 13, color: scheme.error),
+              const SizedBox(width: 5),
+              Text(
+                '清除筛选',
+                style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                  color: scheme.error,
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w800,
+                  height: 1,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -966,253 +1399,310 @@ class _DownloaderTorrentListPageState extends State<DownloaderTorrentListPage> {
     );
   }
 
-  Widget _floatingBarDivider(BuildContext context) {
-    return Container(
-      width: 1,
-      height: 20,
-      margin: const EdgeInsets.symmetric(horizontal: 6),
-      color: Theme.of(context).colorScheme.outlineVariant.withValues(
-        alpha: Theme.of(context).brightness == Brightness.dark ? 0.35 : 0.4,
+  PopupMenuItem<Object> _popupMenuSectionLabel(String label) {
+    final scheme = Theme.of(context).colorScheme;
+    return PopupMenuItem<Object>(
+      enabled: false,
+      height: 34,
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
+          color: scheme.onSurfaceVariant,
+          letterSpacing: 0.2,
+        ),
       ),
     );
   }
 
-  Widget _buildFloatingToolbar(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
+  PopupMenuItem<Object> _popupMenuCheckRow({
+    required Object value,
+    required IconData icon,
+    required String label,
+    required bool selected,
+    Color? selectedColor,
+  }) {
+    final scheme = Theme.of(context).colorScheme;
+    final accent = selectedColor ?? scheme.primary;
+    final iconColor = selected ? accent : scheme.onSurfaceVariant;
+    return PopupMenuItem<Object>(
+      value: value,
       child: Row(
         children: [
+          Icon(icon, size: 18, color: iconColor),
+          const SizedBox(width: 12),
           Expanded(
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(999),
-              child: BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: 32, sigmaY: 32),
-                child: Container(
-                  height: 52,
-                  padding: const EdgeInsets.symmetric(horizontal: 10),
-                  decoration: _floatingBarDecoration(context),
-                  child: Row(
-                    children: [
-                      _buildFloatingFilterButton(context),
-                      _floatingBarDivider(context),
-                      Expanded(child: _buildFloatingFakeInputBar(context)),
-                      _floatingBarDivider(context),
-                      _buildFloatingSortBy(context),
-                    ],
-                  ),
-                ),
+            child: Text(
+              label,
+              style: TextStyle(
+                color: selected ? accent : scheme.onSurface,
+                fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
+                fontSize: 15,
               ),
             ),
           ),
-          const SizedBox(width: 8),
-          CupertinoButton.filled(
-            padding: EdgeInsets.zero,
-            borderRadius: BorderRadius.circular(999),
-            onPressed: () =>
-                showTorrentDownloadScreen(context, controller: controller),
-            child: const Icon(
-              CupertinoIcons.add,
-              size: 20,
-              color: Colors.white,
-            ),
-          ),
+          if (selected)
+            Icon(Icons.check_circle_rounded, size: 18, color: accent),
         ],
       ),
     );
   }
 
-  Widget _buildFloatingFilterButton(BuildContext context) {
-    if (controller is! QBController) {
-      return const SizedBox(width: 0);
-    }
-    final qbController = controller as QBController;
-    return Obx(() {
-      final hasFilters = qbController.filter.value.hasFilters;
-      final activeColor = Theme.of(context).colorScheme.primary;
-      final normalColor = Theme.of(context).colorScheme.onSurfaceVariant;
-      return CupertinoButton(
-        padding: EdgeInsets.zero,
-        minimumSize: Size.zero,
-        onPressed: () => _openFloatingFilterSheet(context),
-        child: Icon(
-          CupertinoIcons.slider_horizontal_3,
-          size: 20,
-          color: hasFilters ? activeColor : normalColor,
+  List<PopupMenuEntry<Object>> _appBarSortMenuEntries(BuildContext context) {
+    if (controller is QBController) {
+      final qb = controller as QBController;
+      final current = qb.torrentSortType.value;
+      final ascending = _isQbSortAscending(current);
+      IconData iconFor(QBTorrentSortType type) {
+        switch (type) {
+          case QBTorrentSortType.size:
+            return Icons.storage_rounded;
+          case QBTorrentSortType.progress:
+            return Icons.percent_rounded;
+          case QBTorrentSortType.dateAdded:
+            return Icons.calendar_today_rounded;
+          case QBTorrentSortType.speed:
+            return Icons.speed_rounded;
+          case QBTorrentSortType.seeds:
+            return Icons.people_rounded;
+          case QBTorrentSortType.ratio:
+            return Icons.compare_arrows_rounded;
+          default:
+            return Icons.sort_rounded;
+        }
+      }
+
+      return [
+        _popupMenuSectionLabel('排序字段'),
+        ...QBTorrentSortType.sortTypes.map(
+          (sortType) => _popupMenuCheckRow(
+            value: sortType,
+            icon: iconFor(sortType),
+            label: sortType.label,
+            selected: sortType == current,
+          ),
         ),
+        const PopupMenuDivider(),
+        _popupMenuSectionLabel('排序方向'),
+        _popupMenuCheckRow(
+          value: _SortDirectionChoice.ascending,
+          icon: Icons.arrow_upward_rounded,
+          label: '正序',
+          selected: ascending,
+        ),
+        _popupMenuCheckRow(
+          value: _SortDirectionChoice.descending,
+          icon: Icons.arrow_downward_rounded,
+          label: '倒序',
+          selected: !ascending,
+        ),
+      ];
+    }
+    if (controller is TransmissionController) {
+      final tr = controller as TransmissionController;
+      final current = tr.listSortType.value;
+      final ascending = _isTransmissionSortAscending(current);
+      IconData iconFor(TransmissionTorrentSortType type) {
+        switch (type) {
+          case TransmissionTorrentSortType.name:
+            return Icons.sort_by_alpha_rounded;
+          case TransmissionTorrentSortType.size:
+            return Icons.storage_rounded;
+          case TransmissionTorrentSortType.progress:
+            return Icons.percent_rounded;
+          case TransmissionTorrentSortType.dateAdded:
+            return Icons.calendar_today_rounded;
+          case TransmissionTorrentSortType.speed:
+            return Icons.speed_rounded;
+          case TransmissionTorrentSortType.seeds:
+            return Icons.people_rounded;
+          case TransmissionTorrentSortType.ratio:
+            return Icons.compare_arrows_rounded;
+        }
+      }
+
+      return [
+        _popupMenuSectionLabel('排序字段'),
+        ...TransmissionTorrentSortType.sortTypes.map(
+          (sortType) => _popupMenuCheckRow(
+            value: sortType,
+            icon: iconFor(sortType),
+            label: sortType.label,
+            selected: sortType == current,
+          ),
+        ),
+        const PopupMenuDivider(),
+        _popupMenuSectionLabel('排序方向'),
+        _popupMenuCheckRow(
+          value: _SortDirectionChoice.ascending,
+          icon: Icons.arrow_upward_rounded,
+          label: '正序',
+          selected: ascending,
+        ),
+        _popupMenuCheckRow(
+          value: _SortDirectionChoice.descending,
+          icon: Icons.arrow_downward_rounded,
+          label: '倒序',
+          selected: !ascending,
+        ),
+      ];
+    }
+    return [];
+  }
+
+  void _onAppBarMenuSelected(Object value) {
+    if (value is _AppBarMenuAction) {
+      switch (value) {
+        case _AppBarMenuAction.filter:
+          if (controller is QBController) {
+            _scaffoldKey.currentState?.openEndDrawer();
+          }
+        case _AppBarMenuAction.select:
+          _enterSelectionMode();
+        case _AppBarMenuAction.log:
+          if (controller is QBController) {
+            Get.to(() => QBLogPage(controller: controller as QBController));
+          }
+      }
+      return;
+    }
+    if (value is QBTorrentSortType) {
+      (controller as QBController).sortTorrents(value);
+      return;
+    }
+    if (value is TransmissionTorrentSortType) {
+      (controller as TransmissionController).listSortType.value = value;
+      return;
+    }
+    if (value is _SortDirectionChoice) {
+      setState(() {
+        if (controller is QBController) {
+          final qb = controller as QBController;
+          _qbSortAscending[qb.torrentSortType.value] =
+              value == _SortDirectionChoice.ascending;
+        } else if (controller is TransmissionController) {
+          final tr = controller as TransmissionController;
+          _trSortAscending[tr.listSortType.value] =
+              value == _SortDirectionChoice.ascending;
+        }
+      });
+    }
+  }
+
+  Widget _buildAppBarViewMenu(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Obx(() {
+      final hasFilters = controller is QBController
+          ? (controller as QBController).filter.value.hasFilters
+          : false;
+
+      return PopupMenuButton<Object>(
+        tooltip: '视图与筛选',
+        offset: const Offset(0, 44),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        icon: Icon(
+          CupertinoIcons.slider_horizontal_3,
+          size: 21,
+          color: hasFilters ? scheme.primary : scheme.onSurfaceVariant,
+        ),
+        onSelected: _onAppBarMenuSelected,
+        itemBuilder: (ctx) => [
+          if (controller is QBController) ...[
+            _popupMenuSectionLabel('筛选'),
+            PopupMenuItem<Object>(
+              value: _AppBarMenuAction.filter,
+              child: Row(
+                children: [
+                  Icon(
+                    CupertinoIcons.slider_horizontal_3,
+                    size: 18,
+                    color: hasFilters
+                        ? scheme.primary
+                        : scheme.onSurfaceVariant,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      '筛选',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: hasFilters
+                            ? FontWeight.w600
+                            : FontWeight.w400,
+                        color: hasFilters ? scheme.primary : scheme.onSurface,
+                      ),
+                    ),
+                  ),
+                  if (hasFilters)
+                    Container(
+                      width: 8,
+                      height: 8,
+                      decoration: BoxDecoration(
+                        color: scheme.primary,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            const PopupMenuDivider(),
+          ],
+          ..._appBarSortMenuEntries(ctx),
+        ],
       );
     });
   }
 
-  Widget _buildFloatingFakeInputBar(BuildContext context) {
-    if (controller is TransmissionController) {
-      final tr = controller as TransmissionController;
-      return GestureDetector(
-        onTap: () => _openTrKeywordSheet(context),
-        behavior: HitTestBehavior.opaque,
-        child: SizedBox(
-          height: 36,
+  Widget _buildAppBarActionsMenu(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return PopupMenuButton<Object>(
+      tooltip: '任务操作',
+      offset: const Offset(0, 44),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      icon: Icon(
+        CupertinoIcons.ellipsis_circle,
+        size: 22,
+        color: scheme.onSurfaceVariant,
+      ),
+      onSelected: _onAppBarMenuSelected,
+      itemBuilder: (ctx) => [
+        _popupMenuSectionLabel('任务'),
+        PopupMenuItem<Object>(
+          value: _AppBarMenuAction.select,
           child: Row(
             children: [
               Icon(
-                CupertinoIcons.search,
-                size: 16,
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                Icons.checklist_rounded,
+                size: 18,
+                color: scheme.onSurfaceVariant,
               ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Obx(() {
-                  final keyword = tr.listSearchKeyword.value;
-                  return Text(
-                    keyword.isEmpty ? '搜索名称、分类、标签…' : keyword,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
-                  );
-                }),
-              ),
+              const SizedBox(width: 12),
+              const Text('多选', style: TextStyle(fontSize: 15)),
             ],
           ),
         ),
-      );
-    }
-    if (controller is! QBController) {
-      return SizedBox(
-        height: 36,
-        child: Align(
-          alignment: Alignment.centerLeft,
-          child: Text(
-            '当前下载器不支持筛选',
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
+        if (isQBittorrent && controller is QBController) ...[
+          const PopupMenuDivider(),
+          _popupMenuSectionLabel('诊断'),
+          PopupMenuItem<Object>(
+            value: _AppBarMenuAction.log,
+            child: Row(
+              children: [
+                Icon(
+                  CupertinoIcons.doc_text,
+                  size: 18,
+                  color: scheme.onSurfaceVariant,
+                ),
+                const SizedBox(width: 12),
+                const Text('日志', style: TextStyle(fontSize: 15)),
+              ],
             ),
           ),
-        ),
-      );
-    }
-    final qbController = controller as QBController;
-    return GestureDetector(
-      onTap: () => _openKeywordSheet(context),
-      behavior: HitTestBehavior.opaque,
-      child: SizedBox(
-        height: 36,
-        child: Row(
-          children: [
-            Icon(
-              CupertinoIcons.search,
-              size: 16,
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Obx(() {
-                final keyword = qbController.filter.value.searchKeyword;
-                return Text(
-                  keyword.isEmpty ? '筛选标题、分类、标签…' : keyword,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
-                );
-              }),
-            ),
-          ],
-        ),
-      ),
+        ],
+      ],
     );
-  }
-
-  Widget _buildFloatingSortBy(BuildContext context) {
-    if (controller is QBController) {
-      return _buildIOSSortButton(context);
-    }
-    if (controller is TransmissionController) {
-      return _buildTrSortButton(context);
-    }
-    return const SizedBox.shrink();
-  }
-
-  Future<void> _openTrKeywordSheet(BuildContext context) async {
-    if (controller is! TransmissionController) return;
-    final tr = controller as TransmissionController;
-    final inputController = TextEditingController(
-      text: tr.listSearchKeyword.value,
-    );
-    final submitted = await showModalBottomSheet<String>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) {
-        final insets = MediaQuery.of(ctx).viewInsets;
-        return Padding(
-          padding: EdgeInsets.only(bottom: insets.bottom),
-          child: Container(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-            decoration: BoxDecoration(
-              color: Theme.of(ctx).colorScheme.surface,
-              borderRadius: const BorderRadius.vertical(
-                top: Radius.circular(18),
-              ),
-            ),
-            child: CupertinoSearchTextField(
-              controller: inputController,
-              autofocus: true,
-              placeholder: '搜索名称、分类、标签…',
-              onSubmitted: (v) => Navigator.of(ctx).pop(v),
-            ),
-          ),
-        );
-      },
-    );
-    inputController.dispose();
-    if (submitted == null) return;
-    tr.listSearchKeyword.value = submitted.trim();
-  }
-
-  Future<void> _openKeywordSheet(BuildContext context) async {
-    if (controller is! QBController) return;
-    final qb = controller as QBController;
-    final inputController = TextEditingController(
-      text: qb.filter.value.searchKeyword,
-    );
-    final submitted = await showModalBottomSheet<String>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) {
-        final insets = MediaQuery.of(ctx).viewInsets;
-        return Padding(
-          padding: EdgeInsets.only(bottom: insets.bottom),
-          child: Container(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-            decoration: BoxDecoration(
-              color: Theme.of(ctx).colorScheme.surface,
-              borderRadius: const BorderRadius.vertical(
-                top: Radius.circular(18),
-              ),
-            ),
-            child: CupertinoSearchTextField(
-              controller: inputController,
-              autofocus: true,
-              placeholder: '筛选标题、分类、标签…',
-              onSubmitted: (v) => Navigator.of(ctx).pop(v),
-            ),
-          ),
-        );
-      },
-    );
-    inputController.dispose();
-    if (submitted == null) return;
-    qb.setFilter(qb.filter.value.copyWith(searchKeyword: submitted.trim()));
-  }
-
-  Future<void> _openFloatingFilterSheet(BuildContext context) async {
-    if (controller is! QBController) return;
-    await showQBFilterDraggableSheet(context, controller as QBController);
   }
 
   Widget _buildErrorMessage(BuildContext context) {
@@ -1284,7 +1774,8 @@ class _DownloaderTorrentListPageState extends State<DownloaderTorrentListPage> {
       2,
       min(
         6,
-        ((usable + _torrentGridGap) / (_torrentGridMinCardWidth + _torrentGridGap))
+        ((usable + _torrentGridGap) /
+                (_torrentGridMinCardWidth + _torrentGridGap))
             .floor(),
       ),
     );
@@ -1310,8 +1801,14 @@ class _DownloaderTorrentListPageState extends State<DownloaderTorrentListPage> {
         ? '${torrent.tags.take(4).join(' · ')}…'
         : torrent.tags.join(' · ');
     final tSmall = Theme.of(context).textTheme.labelSmall;
+    final fill = selected
+        ? Color.alphaBlend(
+            scheme.primary.withValues(alpha: 0.1),
+            scheme.surface,
+          )
+        : scheme.surface;
     return Material(
-      color: scheme.surfaceContainerHighest.withValues(alpha: 0.32),
+      color: fill,
       borderRadius: BorderRadius.circular(12),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
@@ -1323,8 +1820,15 @@ class _DownloaderTorrentListPageState extends State<DownloaderTorrentListPage> {
               color: selected
                   ? scheme.primary
                   : scheme.outlineVariant.withValues(alpha: 0.22),
-              width: selected ? 1.8 : 0.7,
+              width: selected ? 1.3 : 0.7,
             ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.035),
+                blurRadius: 10,
+                offset: const Offset(0, 3),
+              ),
+            ],
           ),
           padding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
           child: Align(
@@ -1348,6 +1852,16 @@ class _DownloaderTorrentListPageState extends State<DownloaderTorrentListPage> {
                           color: scheme.onSurface,
                         ),
                       ),
+                    ),
+                    const SizedBox(width: 6),
+                    Icon(
+                      selected
+                          ? CupertinoIcons.checkmark_circle_fill
+                          : CupertinoIcons.circle,
+                      size: 16,
+                      color: selected
+                          ? scheme.primary
+                          : scheme.onSurfaceVariant.withValues(alpha: 0.45),
                     ),
                   ],
                 ),
@@ -1492,110 +2006,128 @@ class _DownloaderTorrentListPageState extends State<DownloaderTorrentListPage> {
     );
   }
 
-  Widget _buildTorrentList(BuildContext context) {
-    return Obx(() {
-      final displayTorrents = filteredTorrentsList;
-      final isWideLayout = MediaQuery.sizeOf(context).width > 600;
-      if (_isBootstrapping.value && displayTorrents.isEmpty) {
-        return _buildSkeletonList(context, isWideLayout: isWideLayout);
-      }
+  Widget _buildTorrentListSliver(BuildContext context) {
+    final displayTorrents = filteredTorrentsList;
+    final isWideLayout = MediaQuery.sizeOf(context).width > 600;
+    if (_isBootstrapping.value && displayTorrents.isEmpty) {
+      return _buildSkeletonList(context, isWideLayout: isWideLayout);
+    }
 
-      if (displayTorrents.isEmpty) {
-        return SliverFillRemaining(
-          hasScrollBody: false,
-          child: Center(
+    if (displayTorrents.isEmpty) {
+      final hasAnyTorrent = controller.torrentsUniversal.isNotEmpty;
+      final hasFilters = _hasActiveFilters();
+      return SliverFillRemaining(
+        hasScrollBody: false,
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(28),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Icon(
-                  Icons.cloud_download_outlined,
+                  hasAnyTorrent
+                      ? Icons.search_off_rounded
+                      : Icons.cloud_download_outlined,
                   size: 64,
                   color: Theme.of(
                     context,
-                  ).colorScheme.onSurface.withValues(alpha: 0.3),
+                  ).colorScheme.onSurface.withValues(alpha: 0.28),
                 ),
                 const SizedBox(height: 16),
                 Text(
-                  '暂无种子',
-                  style: TextStyle(
-                    color: Theme.of(
-                      context,
-                    ).colorScheme.onSurface.withValues(alpha: 0.5),
-                    fontSize: 16,
+                  hasAnyTorrent ? '没有匹配的任务' : '暂无种子',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurface,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
+                const SizedBox(height: 8),
+                Text(
+                  hasAnyTorrent
+                      ? '换个关键词，或清除筛选条件后再看看。'
+                      : '点击右下角添加任务，或下拉刷新当前下载器。',
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    height: 1.35,
+                  ),
+                ),
+                if (hasFilters) ...[
+                  const SizedBox(height: 18),
+                  FilledButton.icon(
+                    onPressed: _clearListFilters,
+                    icon: const Icon(Icons.close_rounded, size: 18),
+                    label: const Text('清除筛选'),
+                  ),
+                ],
               ],
             ),
           ),
-        );
-      }
+        ),
+      );
+    }
 
-      if (_selectionMode) {
-        final w = MediaQuery.sizeOf(context).width;
-        final n = _selectionGridCrossAxisCount(w);
-        return SliverPadding(
-          padding: const EdgeInsets.symmetric(horizontal: 8),
-          sliver: SliverGrid.builder(
-            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: n,
-              mainAxisSpacing: 8,
-              crossAxisSpacing: 8,
-              childAspectRatio: 1.5,
-            ),
-            itemCount: displayTorrents.length,
-            itemBuilder: (context, index) {
-              return _buildSelectionGridTile(context, displayTorrents[index]);
-            },
-          ),
-        );
-      }
-
-      if (!isWideLayout) {
-        return SliverList.builder(
-          itemCount: displayTorrents.length,
-          itemBuilder: (context, index) {
-            final torrent = displayTorrents[index];
-            return TorrentListItem(
-              torrent: torrent,
-              controller: controller,
-              selectionMode: _selectionMode,
-              selected: _selectedHashes.contains(torrent.hash),
-              onToggleSelected: () => _toggleHash(torrent.hash),
-              onLongPressEnterSelect: () => setState(() {
-                _selectionMode = true;
-                _selectedHashes.add(torrent.hash);
-              }),
-            );
-          },
-        );
-      }
-
+    if (_selectionMode) {
+      final w = MediaQuery.sizeOf(context).width;
+      final n = _selectionGridCrossAxisCount(w);
       return SliverPadding(
         padding: const EdgeInsets.symmetric(horizontal: 8),
         sliver: SliverGrid.builder(
-          gridDelegate: _torrentGridDelegate(MediaQuery.sizeOf(context).width),
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: n,
+            mainAxisSpacing: 8,
+            crossAxisSpacing: 8,
+            childAspectRatio: 1.5,
+          ),
           itemCount: displayTorrents.length,
           itemBuilder: (context, index) {
-            final torrent = displayTorrents[index];
-            return ClipRRect(
-              borderRadius: BorderRadius.circular(12),
-              child: TorrentListItem(
-                torrent: torrent,
-                controller: controller,
-                compact: true,
-                selectionMode: _selectionMode,
-                selected: _selectedHashes.contains(torrent.hash),
-                onToggleSelected: () => _toggleHash(torrent.hash),
-                onLongPressEnterSelect: () => setState(() {
-                  _selectionMode = true;
-                  _selectedHashes.add(torrent.hash);
-                }),
-              ),
-            );
+            return _buildSelectionGridTile(context, displayTorrents[index]);
           },
         ),
       );
-    });
+    }
+
+    if (!isWideLayout) {
+      return SliverList.builder(
+        itemCount: displayTorrents.length,
+        itemBuilder: (context, index) {
+          final torrent = displayTorrents[index];
+          return TorrentListItem(
+            torrent: torrent,
+            controller: controller,
+            selectionMode: _selectionMode,
+            selected: _selectedHashes.contains(torrent.hash),
+            onToggleSelected: () => _toggleHash(torrent.hash),
+            onLongPressEnterSelect: () =>
+                _enterSelectionMode(hash: torrent.hash),
+          );
+        },
+      );
+    }
+
+    return SliverPadding(
+      padding: const EdgeInsets.symmetric(horizontal: 8),
+      sliver: SliverGrid.builder(
+        gridDelegate: _torrentGridDelegate(MediaQuery.sizeOf(context).width),
+        itemCount: displayTorrents.length,
+        itemBuilder: (context, index) {
+          final torrent = displayTorrents[index];
+          return ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: TorrentListItem(
+              torrent: torrent,
+              controller: controller,
+              compact: true,
+              selectionMode: _selectionMode,
+              selected: _selectedHashes.contains(torrent.hash),
+              onToggleSelected: () => _toggleHash(torrent.hash),
+              onLongPressEnterSelect: () =>
+                  _enterSelectionMode(hash: torrent.hash),
+            ),
+          );
+        },
+      ),
+    );
   }
 
   Widget _buildSkeletonList(BuildContext context, {bool isWideLayout = false}) {
@@ -1688,378 +2220,6 @@ class _DownloaderTorrentListPageState extends State<DownloaderTorrentListPage> {
     );
   }
 
-  Widget _buildTrSortButton(BuildContext context) {
-    if (controller is! TransmissionController) {
-      return const SizedBox.shrink();
-    }
-    return Obx(() {
-      final tr = controller as TransmissionController;
-      final current = tr.listSortType.value;
-      final ascending = _isTransmissionSortAscending(current);
-      final theme = Theme.of(context);
-      IconData iconFor(TransmissionTorrentSortType type) {
-        switch (type) {
-          case TransmissionTorrentSortType.name:
-            return Icons.sort_by_alpha_rounded;
-          case TransmissionTorrentSortType.size:
-            return Icons.storage_rounded;
-          case TransmissionTorrentSortType.progress:
-            return Icons.percent_rounded;
-          case TransmissionTorrentSortType.dateAdded:
-            return Icons.calendar_today_rounded;
-          case TransmissionTorrentSortType.speed:
-            return Icons.speed_rounded;
-          case TransmissionTorrentSortType.seeds:
-            return Icons.people_rounded;
-          case TransmissionTorrentSortType.ratio:
-            return Icons.compare_arrows_rounded;
-        }
-      }
-
-      return PopupMenuButton<Object>(
-        offset: const Offset(0, 40),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        onSelected: (value) {
-          if (value is TransmissionTorrentSortType) {
-            tr.listSortType.value = value;
-            return;
-          }
-          if (value is _SortDirectionChoice) {
-            setState(() {
-              _trSortAscending[current] =
-                  value == _SortDirectionChoice.ascending;
-            });
-          }
-        },
-        itemBuilder: (ctx) => [
-          ...TransmissionTorrentSortType.sortTypes.map((sortType) {
-            final isSelected = sortType == current;
-            final iconColor = isSelected
-                ? theme.colorScheme.primary
-                : theme.colorScheme.onSurfaceVariant;
-            return PopupMenuItem<Object>(
-              value: sortType,
-              child: Row(
-                children: [
-                  Icon(iconFor(sortType), size: 18, color: iconColor),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      sortType.label,
-                      style: TextStyle(
-                        color: isSelected
-                            ? theme.colorScheme.primary
-                            : theme.colorScheme.onSurface,
-                        fontWeight: isSelected
-                            ? FontWeight.w600
-                            : FontWeight.normal,
-                        fontSize: 15,
-                      ),
-                    ),
-                  ),
-                  if (isSelected) ...[
-                    const SizedBox(width: 8),
-                    Icon(
-                      Icons.check_circle_rounded,
-                      size: 18,
-                      color: theme.colorScheme.primary,
-                    ),
-                  ],
-                ],
-              ),
-            );
-          }),
-          const PopupMenuDivider(),
-          PopupMenuItem<Object>(
-            value: _SortDirectionChoice.ascending,
-            child: Row(
-              children: [
-                Icon(
-                  Icons.arrow_upward_rounded,
-                  size: 18,
-                  color: ascending
-                      ? theme.colorScheme.primary
-                      : theme.colorScheme.onSurfaceVariant,
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    '正序',
-                    style: TextStyle(
-                      color: ascending
-                          ? theme.colorScheme.primary
-                          : theme.colorScheme.onSurface,
-                      fontWeight: ascending
-                          ? FontWeight.w600
-                          : FontWeight.normal,
-                      fontSize: 15,
-                    ),
-                  ),
-                ),
-                if (ascending)
-                  Icon(
-                    Icons.check_circle_rounded,
-                    size: 18,
-                    color: theme.colorScheme.primary,
-                  ),
-              ],
-            ),
-          ),
-          PopupMenuItem<Object>(
-            value: _SortDirectionChoice.descending,
-            child: Row(
-              children: [
-                Icon(
-                  Icons.arrow_downward_rounded,
-                  size: 18,
-                  color: !ascending
-                      ? theme.colorScheme.primary
-                      : theme.colorScheme.onSurfaceVariant,
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    '倒序',
-                    style: TextStyle(
-                      color: !ascending
-                          ? theme.colorScheme.primary
-                          : theme.colorScheme.onSurface,
-                      fontWeight: !ascending
-                          ? FontWeight.w600
-                          : FontWeight.normal,
-                      fontSize: 15,
-                    ),
-                  ),
-                ),
-                if (!ascending)
-                  Icon(
-                    Icons.check_circle_rounded,
-                    size: 18,
-                    color: theme.colorScheme.primary,
-                  ),
-              ],
-            ),
-          ),
-        ],
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              ascending
-                  ? Icons.arrow_upward_rounded
-                  : Icons.arrow_downward_rounded,
-              size: 14,
-              color: theme.colorScheme.primary,
-            ),
-            const SizedBox(width: 4),
-            Text(
-              current.label,
-              style: TextStyle(
-                color: theme.colorScheme.primary,
-                fontWeight: FontWeight.w600,
-                fontSize: 13,
-              ),
-            ),
-            const SizedBox(width: 2),
-            Icon(
-              Icons.arrow_drop_down_rounded,
-              size: 16,
-              color: theme.colorScheme.primary,
-            ),
-          ],
-        ),
-      );
-    });
-  }
-
-  Widget _buildIOSSortButton(BuildContext context) {
-    if (controller is! QBController) {
-      return const SizedBox.shrink();
-    }
-
-    return Obx(() {
-      final qbController = controller as QBController;
-      final currentSortType = qbController.torrentSortType.value;
-      final ascending = _isQbSortAscending(currentSortType);
-
-      final theme = Theme.of(context);
-
-      return PopupMenuButton<Object>(
-        offset: const Offset(0, 40),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        onSelected: (value) {
-          if (value is QBTorrentSortType) {
-            (controller as QBController).sortTorrents(value);
-            return;
-          }
-          if (value is _SortDirectionChoice) {
-            setState(() {
-              _qbSortAscending[currentSortType] =
-                  value == _SortDirectionChoice.ascending;
-            });
-          }
-        },
-        itemBuilder: (BuildContext context) => [
-          ...QBTorrentSortType.sortTypes.map((sortType) {
-            IconData getSortIcon(QBTorrentSortType type) {
-              switch (type) {
-                case QBTorrentSortType.size:
-                  return Icons.storage_rounded;
-                case QBTorrentSortType.progress:
-                  return Icons.percent_rounded;
-                case QBTorrentSortType.dateAdded:
-                  return Icons.calendar_today_rounded;
-                case QBTorrentSortType.speed:
-                  return Icons.speed_rounded;
-                case QBTorrentSortType.seeds:
-                  return Icons.people_rounded;
-                case QBTorrentSortType.ratio:
-                  return Icons.compare_arrows_rounded;
-                default:
-                  return Icons.sort_rounded;
-              }
-            }
-
-            final isSelected = sortType == currentSortType;
-            final iconColor = isSelected
-                ? theme.colorScheme.primary
-                : theme.colorScheme.onSurfaceVariant;
-
-            return PopupMenuItem<Object>(
-              value: sortType,
-              child: Row(
-                children: [
-                  Icon(getSortIcon(sortType), size: 18, color: iconColor),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      sortType.label,
-                      style: TextStyle(
-                        color: isSelected
-                            ? theme.colorScheme.primary
-                            : theme.colorScheme.onSurface,
-                        fontWeight: isSelected
-                            ? FontWeight.w600
-                            : FontWeight.normal,
-                        fontSize: 15,
-                      ),
-                    ),
-                  ),
-                  if (isSelected) ...[
-                    const SizedBox(width: 8),
-                    Icon(
-                      Icons.check_circle_rounded,
-                      size: 18,
-                      color: theme.colorScheme.primary,
-                    ),
-                  ],
-                ],
-              ),
-            );
-          }),
-          const PopupMenuDivider(),
-          PopupMenuItem<Object>(
-            value: _SortDirectionChoice.ascending,
-            child: Row(
-              children: [
-                Icon(
-                  Icons.arrow_upward_rounded,
-                  size: 18,
-                  color: ascending
-                      ? theme.colorScheme.primary
-                      : theme.colorScheme.onSurfaceVariant,
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    '正序',
-                    style: TextStyle(
-                      color: ascending
-                          ? theme.colorScheme.primary
-                          : theme.colorScheme.onSurface,
-                      fontWeight: ascending
-                          ? FontWeight.w600
-                          : FontWeight.normal,
-                      fontSize: 15,
-                    ),
-                  ),
-                ),
-                if (ascending)
-                  Icon(
-                    Icons.check_circle_rounded,
-                    size: 18,
-                    color: theme.colorScheme.primary,
-                  ),
-              ],
-            ),
-          ),
-          PopupMenuItem<Object>(
-            value: _SortDirectionChoice.descending,
-            child: Row(
-              children: [
-                Icon(
-                  Icons.arrow_downward_rounded,
-                  size: 18,
-                  color: !ascending
-                      ? theme.colorScheme.primary
-                      : theme.colorScheme.onSurfaceVariant,
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    '倒序',
-                    style: TextStyle(
-                      color: !ascending
-                          ? theme.colorScheme.primary
-                          : theme.colorScheme.onSurface,
-                      fontWeight: !ascending
-                          ? FontWeight.w600
-                          : FontWeight.normal,
-                      fontSize: 15,
-                    ),
-                  ),
-                ),
-                if (!ascending)
-                  Icon(
-                    Icons.check_circle_rounded,
-                    size: 18,
-                    color: theme.colorScheme.primary,
-                  ),
-              ],
-            ),
-          ),
-        ],
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              ascending
-                  ? Icons.arrow_upward_rounded
-                  : Icons.arrow_downward_rounded,
-              size: 14,
-              color: theme.colorScheme.primary,
-            ),
-            const SizedBox(width: 4),
-            Text(
-              currentSortType.label,
-              style: TextStyle(
-                color: theme.colorScheme.primary,
-                fontWeight: FontWeight.w600,
-                fontSize: 13,
-              ),
-            ),
-            const SizedBox(width: 2),
-            Icon(
-              Icons.arrow_drop_down_rounded,
-              size: 16,
-              color: theme.colorScheme.primary,
-            ),
-          ],
-        ),
-      );
-    });
-  }
-
   PreferredSizeWidget _buildAppBar(BuildContext context) {
     if (_selectionMode) {
       return _buildSelectionAppBar(context);
@@ -2077,31 +2237,11 @@ class _DownloaderTorrentListPageState extends State<DownloaderTorrentListPage> {
       backgroundColor: colorScheme.surface,
       surfaceTintColor: Colors.transparent,
       elevation: 0,
-      leadingWidth: 52,
-      leading: Padding(
-        padding: const EdgeInsets.only(left: 4),
-        child: Center(
-          child: IconButton(
-            onPressed: () {
-              setState(() {
-                _selectionMode = false;
-                _selectedHashes.clear();
-              });
-            },
-            style: IconButton.styleFrom(
-              foregroundColor: colorScheme.onSurface,
-              backgroundColor: colorScheme.surfaceContainerHighest,
-              minimumSize: const Size(40, 40),
-              padding: EdgeInsets.zero,
-              shape: const CircleBorder(),
-            ),
-            icon: Icon(
-              Icons.arrow_back_rounded,
-              size: 22,
-              color: colorScheme.onSurface,
-            ),
-          ),
-        ),
+      leadingWidth: DownloaderAppBarBackButton.leadingWidth,
+      leading: DownloaderAppBarBackButton(
+        onPressed: () {
+          _exitSelectionMode();
+        },
       ),
       title: Text(
         _selectedHashes.isEmpty ? '选择项目' : '已选 ${_selectedHashes.length} 项',
@@ -2198,28 +2338,8 @@ class _DownloaderTorrentListPageState extends State<DownloaderTorrentListPage> {
       elevation: 0,
       scrolledUnderElevation: 0,
       toolbarHeight: 52,
-      leadingWidth: 56,
-      leading: Padding(
-        padding: const EdgeInsets.only(left: 6),
-        child: Center(
-          child: IconButton(
-            onPressed: () => Get.back(),
-            style: IconButton.styleFrom(
-              foregroundColor: colorScheme.onSurface,
-              backgroundColor: colorScheme.surfaceContainerHighest,
-              minimumSize: const Size(44, 44),
-              maximumSize: const Size(44, 44),
-              padding: EdgeInsets.zero,
-              shape: const CircleBorder(),
-            ),
-            icon: Icon(
-              Icons.arrow_back_rounded,
-              size: 24,
-              color: colorScheme.onSurface,
-            ),
-          ),
-        ),
-      ),
+      leadingWidth: DownloaderAppBarBackButton.leadingWidth,
+      leading: const DownloaderAppBarBackButton(),
       titleSpacing: 4,
       title: Text(
         titleText,
@@ -2234,101 +2354,9 @@ class _DownloaderTorrentListPageState extends State<DownloaderTorrentListPage> {
       ),
       centerTitle: false,
       actions: [
-        PopupMenuButton<String>(
-          tooltip: '菜单',
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-          icon: Icon(
-            Icons.more_vert_rounded,
-            color: colorScheme.onSurfaceVariant,
-          ),
-          onSelected: (v) {
-            switch (v) {
-              case 'profile':
-                Get.to(() => DownloaderProfilePage(controller: controller));
-                break;
-              case 'select':
-                setState(() => _selectionMode = true);
-                break;
-              case 'log':
-                if (controller is QBController) {
-                  Get.to(
-                    () => QBLogPage(controller: controller as QBController),
-                  );
-                }
-                break;
-              case 'rss':
-                if (controller is QBController) {
-                  Get.to(
-                    () => QBRssListPage(controller: controller as QBController),
-                  );
-                }
-                break;
-            }
-          },
-          itemBuilder: (ctx) => [
-            PopupMenuItem(
-              value: 'profile',
-              child: Row(
-                children: [
-                  Icon(
-                    Icons.person_outline_rounded,
-                    size: 20,
-                    color: colorScheme.primary,
-                  ),
-                  const SizedBox(width: 12),
-                  const Text('下载器信息'),
-                ],
-              ),
-            ),
-            PopupMenuItem(
-              value: 'select',
-              child: Row(
-                children: [
-                  Icon(
-                    Icons.checklist_rounded,
-                    size: 20,
-                    color: colorScheme.primary,
-                  ),
-                  const SizedBox(width: 12),
-                  const Text('多选'),
-                ],
-              ),
-            ),
-            if (isQBittorrent && controller is QBController) ...[
-              PopupMenuItem(
-                value: 'log',
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.description_outlined,
-                      size: 20,
-                      color: colorScheme.onSurface,
-                    ),
-                    const SizedBox(width: 12),
-                    const Text('日志'),
-                  ],
-                ),
-              ),
-              PopupMenuItem(
-                value: 'rss',
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.rss_feed_outlined,
-                      size: 20,
-                      color: colorScheme.onSurface,
-                    ),
-                    const SizedBox(width: 12),
-                    const Text('RSS 订阅'),
-                  ],
-                ),
-              ),
-            ],
-          ],
-        ),
-        const SizedBox(width: 2),
+        _buildAppBarViewMenu(context),
+        _buildAppBarActionsMenu(context),
+        const SizedBox(width: 4),
       ],
       bottom: PreferredSize(
         preferredSize: const Size.fromHeight(31),
